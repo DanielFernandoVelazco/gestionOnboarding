@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html class="light" lang="es">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>Dashboard de Colaboradores</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&amp;display=swap"
+    rel="stylesheet" />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap"
+    rel="stylesheet" />
+  <script id="tailwind-config">
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#137fec",
+            "background-light": "#f6f7f8",
+            "background-dark": "#101922",
+          },
+          fontFamily: {
+            "display": ["Inter"]
+          },
+          borderRadius: {
+            "DEFAULT": "0.25rem",
+            "lg": "0.5rem",
+            "xl": "0.75rem",
+            "full": "9999px"
+          },
+        },
+      },
+    }
+  </script>
+</head>
+
+<body class="font-display bg-background-light dark:bg-background-dark">
+  <div class="relative flex min-h-screen w-full flex-row">
+    <aside
+      class="flex w-64 flex-col gap-y-6 border-r border-gray-200 bg-white p-4 dark:border-gray-800 dark:bg-background-dark">
+      <div class="flex h-full flex-col justify-between p-4">
+        <div class="flex flex-col gap-4">
+          <div class="flex items-center gap-3 p-2">
+            <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10" data-alt="Company Logo"
+              style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBsA2XA2Lx6CuvMGrtQ1NoKjI8v0T_b-Des-w8pzlfvwqma0xVWQRJ_ybtfCfLBOzoCSbL6DsrIlosyhT_SiaF-taAy9D5EGjFw23WVN19-nq-xu1t3oOhzfsAOUfucu3sr6MkGPjnIrTnq4YzSQ9Wk-PKL7gPBP-ERidVa8k7xX-Mj88gbFgSiAZ3aidiGjehu0F3KbEoltxmSpvPfpTZjgaWOQ3ET6fkgNasV14wAEJiCD8jEPZ5kz8w7HVeZfRPWEJ71DjgOzXk");'>
+            </div>
+            <div class="flex flex-col">
+              <h1 class="text-gray-900 dark:text-white text-base font-medium leading-normal">Ana García</h1>
+              <p class="text-gray-500 dark:text-gray-400 text-sm font-normal leading-normal">Admin</p>
+            </div>
+          </div>
+          <nav class="flex flex-col gap-2 mt-4">
+
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              href="#">
+              <span class="material-symbols-outlined">person_add</span>
+              <p class="text-sm font-medium leading-normal">Registro de Colaboradores</p>
+            </a>
+
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg bg-primary/10 dark:bg-primary/20 text-primary dark:text-primary"
+              href="#">
+              <span class="material-symbols-outlined fill">table_view</span>
+              <p class="text-sm font-medium leading-normal">Tabla de Colaboradores</p>
+            </a>
+
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              href="#">
+              <span class="material-symbols-outlined">calendar_month</span>
+              <p class="text-sm font-medium leading-normal">Calendario de Onboardings</p>
+            </a>
+
+            <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+              href="#">
+              <span class="material-symbols-outlined">mark_email_unread</span>
+              <p class="text-sm font-medium leading-normal">Alertas de Correo</p>
+            </a>
+          </nav>
+        </div>
+        <div class="flex flex-col gap-1">
+          <a class="flex items-center gap-3 px-3 py-2 rounded-lg text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+            href="#">
+            <span class="material-symbols-outlined text-gray-700 dark:text-gray-300">logout</span>
+            <p class="text-sm font-medium">Cerrar Sesión</p>
+          </a>
+        </div>
+      </div>
+    </aside>
+    <main class="flex-1 p-8">
+      <div class="flex max-w-full flex-col">
+        <div class="flex flex-wrap items-center justify-between gap-4">
+          <div class="flex min-w-72 flex-col gap-2">
+            <h1 class="text-3xl font-bold tracking-tight text-[#111418] dark:text-white">Tabla de Colaboradores</h1>
+            <p class="text-base font-normal text-[#617589] dark:text-gray-400">Gestiona el onboarding de todos los
+              nuevos colaboradores.</p>
+          </div>
+          <button
+            class="flex h-10 min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center gap-2 overflow-hidden rounded-lg bg-primary px-4 text-sm font-bold leading-normal tracking-[0.015em] text-white shadow-sm hover:bg-primary/90">
+            <span class="material-symbols-outlined">add</span>
+            <span class="truncate">Agregar Colaborador</span>
+          </button>
+        </div>
+        <div class="mt-8 flex flex-wrap items-center justify-between gap-4">
+          <div class="relative flex-grow">
+            <span class="material-symbols-outlined absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+            <input
+              class="form-input h-12 w-full min-w-40 rounded-lg border border-gray-200 bg-white pl-12 pr-4 text-base font-normal text-[#111418] placeholder:text-[#617589] focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-gray-700 dark:bg-background-dark dark:text-gray-100 dark:placeholder:text-gray-400"
+              placeholder="Buscar por nombre o correo..." value="" />
+          </div>
+          <div class="flex gap-3">
+            <button
+              class="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-lg border border-gray-200 bg-white pl-4 pr-3 dark:border-gray-700 dark:bg-background-dark">
+              <p class="text-sm font-medium text-[#111418] dark:text-gray-100">Filtrar por estado</p>
+              <span class="material-symbols-outlined text-[#617589] dark:text-gray-400">expand_more</span>
+            </button>
+            <button
+              class="flex h-12 shrink-0 items-center justify-center gap-x-2 rounded-lg border border-gray-200 bg-white pl-4 pr-3 dark:border-gray-700 dark:bg-background-dark">
+              <p class="text-sm font-medium text-[#111418] dark:text-gray-100">Tipo de Onboarding</p>
+              <span class="material-symbols-outlined text-[#617589] dark:text-gray-400">expand_more</span>
+            </button>
+          </div>
+        </div>
+        <div class="mt-6 flow-root">
+          <div class="overflow-x-auto">
+            <div class="inline-block min-w-full align-middle">
+              <div
+                class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-background-dark/50">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                  <thead class="bg-gray-50 dark:bg-gray-800/50">
+                    <tr>
+                      <th class="py-3.5 pl-4 pr-3 text-left" scope="col">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </th>
+                      <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200"
+                        scope="col">Nombre</th>
+                      <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200"
+                        scope="col">Onboarding Bienvenida</th>
+                      <th class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-gray-200"
+                        scope="col">Onboarding Técnico</th>
+                      <th class="relative py-3.5 pl-3 pr-4" scope="col">
+                        <span class="sr-only">Acciones</span>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-gray-200 bg-white dark:divide-gray-800 dark:bg-background-dark">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/20">
+                      <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <div class="font-medium text-gray-900 dark:text-white">Ana García Pérez</div>
+                        <div class="text-gray-500 dark:text-gray-400">ana.garcia@example.com</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Fecha de ingreso: 15/08/2024</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">Pendiente</span>
+                        <div class="text-gray-500 dark:text-gray-400">Asignado: 22/08/2024</div>
+                      </td>
+                      <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                        <button
+                          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary dark:hover:bg-gray-700 dark:hover:text-gray-300"><span
+                            class="material-symbols-outlined text-xl">more_horiz</span></button>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/20">
+                      <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <div class="font-medium text-gray-900 dark:text-white">Carlos Martínez López</div>
+                        <div class="text-gray-500 dark:text-gray-400">carlos.martinez@example.com</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Fecha de ingreso: 12/08/2024</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Asignado: 19/08/2024</div>
+                      </td>
+                      <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                        <button
+                          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary dark:hover:bg-gray-700 dark:hover:text-gray-300"><span
+                            class="material-symbols-outlined text-xl">more_horiz</span></button>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/20">
+                      <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <div class="font-medium text-gray-900 dark:text-white">Laura Rodríguez Sánchez</div>
+                        <div class="text-gray-500 dark:text-gray-400">laura.rodriguez@example.com</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Fecha de ingreso: 10/08/2024</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-medium text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">En
+                          Progreso</span>
+                        <div class="text-gray-500 dark:text-gray-400">Asignado: 17/08/2024</div>
+                      </td>
+                      <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                        <button
+                          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary dark:hover:bg-gray-700 dark:hover:text-gray-300"><span
+                            class="material-symbols-outlined text-xl">more_horiz</span></button>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/20">
+                      <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <div class="font-medium text-gray-900 dark:text-white">Javier Fernández Ruiz</div>
+                        <div class="text-gray-500 dark:text-gray-400">javier.fernandez@example.com</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">Pendiente</span>
+                        <div class="text-gray-500 dark:text-gray-400">Fecha de ingreso: 05/08/2024</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:bg-yellow-900/50 dark:text-yellow-300">Pendiente</span>
+                        <div class="text-gray-500 dark:text-gray-400">Asignado: 12/08/2024</div>
+                      </td>
+                      <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                        <button
+                          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary dark:hover:bg-gray-700 dark:hover:text-gray-300"><span
+                            class="material-symbols-outlined text-xl">more_horiz</span></button>
+                      </td>
+                    </tr>
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-800/20">
+                      <td class="whitespace-nowrap py-4 pl-4 pr-3 text-sm">
+                        <input
+                          class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary dark:border-gray-600 dark:bg-gray-700 dark:ring-offset-gray-800"
+                          type="checkbox" />
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <div class="font-medium text-gray-900 dark:text-white">Sofía González Morales</div>
+                        <div class="text-gray-500 dark:text-gray-400">sofia.gonzalez@example.com</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Fecha de ingreso: 01/08/2024</div>
+                      </td>
+                      <td class="whitespace-nowrap px-3 py-4 text-sm">
+                        <span
+                          class="inline-flex items-center rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:bg-green-900/50 dark:text-green-300">Completado</span>
+                        <div class="text-gray-500 dark:text-gray-400">Asignado: 08/08/2024</div>
+                      </td>
+                      <td class="relative whitespace-nowrap py-4 pl-3 pr-4 text-right text-sm font-medium">
+                        <button
+                          class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-primary dark:hover:bg-gray-700 dark:hover:text-gray-300"><span
+                            class="material-symbols-outlined text-xl">more_horiz</span></button>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+</body>
+
+</html>
