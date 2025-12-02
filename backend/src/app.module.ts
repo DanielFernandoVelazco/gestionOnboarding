@@ -1,10 +1,11 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppConfigModule } from './config/config.module';
-import databaseConfig from './config/database.config';
+import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthService } from './modules/auth/auth.service';
 
 @Module({
   imports: [
@@ -16,8 +17,16 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
       }),
       inject: [ConfigService],
     }),
+    AuthModule,
   ],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule { }
+export class AppModule implements OnModuleInit {
+  constructor(private readonly authService: AuthService) { }
+
+  async onModuleInit() {
+    // Crear usuario administrador por defecto si no existe
+    await this.authService.seedAdminUser();
+  }
+}
