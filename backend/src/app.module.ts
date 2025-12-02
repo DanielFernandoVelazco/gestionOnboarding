@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './modules/auth/auth.service';
 import { ColaboradoresModule } from './modules/colaboradores/colaboradores.module';
+import { OnboardingModule } from './modules/onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ColaboradoresModule } from './modules/colaboradores/colaboradores.modul
     }),
     AuthModule,
     ColaboradoresModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],
