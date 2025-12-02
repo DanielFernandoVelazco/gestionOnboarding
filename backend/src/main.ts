@@ -5,6 +5,7 @@ import { AppModule } from './app.module';
 import helmet from 'helmet';
 import compression from 'compression';
 import { loggerGlobal } from './middleware/logger.middleware';
+import { DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -37,10 +38,19 @@ async function bootstrap() {
     }),
   );
 
+  // Swagger configuration
+  const config = new DocumentBuilder()
+    .setTitle('Gestión de Onboarding API')
+    .setDescription('API para la gestión de onboarding técnico de colaboradores')
+    .setVersion('1.0')
+    .addBearerAuth()
+    .build();
+
   const port = configService.get('app.port');
   await app.listen(port);
 
   console.log(`Application is running on: http://localhost:${port}`);
   console.log(`API prefix: /${configService.get('app.apiPrefix')}`);
+  console.log(`Swagger docs: http://localhost:${port}/api/docs`);
 }
 bootstrap();
