@@ -7,6 +7,7 @@ import {
     OneToMany,
 } from 'typeorm';
 import { Colaborador } from '../../colaboradores/entities/colaborador.entity';
+import { OnboardingSesion } from './onboarding-sesion.entity';
 
 @Entity('onboarding_tipos')
 export class OnboardingTipo {
@@ -17,7 +18,7 @@ export class OnboardingTipo {
     nombre: string;
 
     @Column({ type: 'varchar', length: 50 })
-    color: string; // Para mostrar en calendario (ej: #E31937)
+    color: string;
 
     @Column({ type: 'text', nullable: true })
     descripcion?: string;
@@ -30,6 +31,9 @@ export class OnboardingTipo {
 
     @OneToMany(() => Colaborador, (colaborador) => colaborador.tipoOnboardingTecnico)
     colaboradores: Colaborador[];
+
+    @OneToMany(() => OnboardingSesion, (sesion) => sesion.tipo)
+    sesiones: OnboardingSesion[];
 
     @CreateDateColumn({ type: 'timestamp' })
     createdAt: Date;
