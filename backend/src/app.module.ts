@@ -6,6 +6,7 @@ import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './modules/auth/auth.service';
+import { ColaboradoresModule } from './modules/colaboradores/colaboradores.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AuthService } from './modules/auth/auth.service';
       inject: [ConfigService],
     }),
     AuthModule,
+    ColaboradoresModule,
   ],
   controllers: [AppController],
   providers: [AppService],
