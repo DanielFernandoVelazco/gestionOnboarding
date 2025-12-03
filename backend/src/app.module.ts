@@ -4,10 +4,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppConfigModule } from './config/config.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { AuthService } from './modules/auth/auth.service';
 import { ColaboradoresModule } from './modules/colaboradores/colaboradores.module';
 import { OnboardingModule } from './modules/onboarding/onboarding.module';
+import { CalendarioModule } from './modules/calendario/calendario.module';
+import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { AuthService } from './modules/auth/auth.service';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { OnboardingModule } from './modules/onboarding/onboarding.module';
     AuthModule,
     ColaboradoresModule,
     OnboardingModule,
+    CalendarioModule,
+    NotificacionesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
