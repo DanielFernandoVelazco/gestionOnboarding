@@ -82,6 +82,13 @@ export class OnboardingService {
         return await this.sesionesRepository.save(sesion);
     }
 
+    async getTipos(): Promise<OnboardingTipo[]> {
+        return await this.tiposRepository.find({
+            where: { activo: true },
+            order: { nombre: 'ASC' },
+        });
+    }
+
     async findAll(filterDto: FilterSesionDto): Promise<PaginatedSesionesResponse> {
         const {
             tipoId,
