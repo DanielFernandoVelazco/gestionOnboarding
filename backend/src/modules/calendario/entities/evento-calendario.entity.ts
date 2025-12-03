@@ -49,7 +49,7 @@ export class EventoCalendario {
 
     @ManyToOne(() => OnboardingSesion, { nullable: true })
     @JoinColumn({ name: 'sesionId' })
-    sesion?: OnboardingSesion;
+    sesion: OnboardingSesion | null;
 
     @ManyToOne(() => User)
     @JoinColumn({ name: 'creadoPorId' })
