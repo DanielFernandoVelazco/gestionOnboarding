@@ -49,6 +49,12 @@ export class OnboardingController {
         return this.onboardingService.findAll(filterDto);
     }
 
+    @Get('tipos')
+    @ApiOperation({ summary: 'Obtener todos los tipos de onboarding' })
+    async getTipos() {
+        return this.onboardingService.getTipos();
+    }
+
     @Get('sesiones/stats')
     @ApiOperation({ summary: 'Obtener estadísticas de sesiones' })
     async getStats() {
