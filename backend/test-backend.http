@@ -1,0 +1,79 @@
+### Variables
+@baseUrl = http://localhost:3000/api
+@authToken = 
+
+### 1. Login para obtener token
+# @name login
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@onboarding.com",
+  "password": "Admin123"
+}
+
+### Guardar token
+@authToken = {{login.response.body.access_token}}
+
+### 2. Obtener perfil
+GET {{baseUrl}}/auth/profile
+Authorization: Bearer {{authToken}}
+
+### 3. Crear colaborador
+# @name createColaborador
+POST {{baseUrl}}/colaboradores
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "nombreCompleto": "Laura Rodríguez Sánchez",
+  "email": "laura.rodriguez@example.com",
+  "telefono": "+1 234 567 891",
+  "departamento": "Tecnología",
+  "puesto": "Desarrolladora Frontend",
+  "fechaIngreso": "2024-08-10",
+  "estadoBienvenida": "completado",
+  "estadoTecnico": "en_progreso",
+  "fechaOnboardingTecnico": "2024-08-17",
+  "notas": "Experiencia en React y TypeScript"
+}
+
+### Guardar ID del colaborador
+@colaboradorId = {{createColaborador.response.body.id}}
+
+### 4. Listar colaboradores
+GET {{baseUrl}}/colaboradores?search=Laura&page=1&limit=10
+Authorization: Bearer {{authToken}}
+
+### 5. Crear sesión de onboarding (necesita tipoId)
+# Primero obtener tipos de onboarding de la base de datos
+# O crear uno si no existe
+
+### 6. Listar sesiones
+GET {{baseUrl}}/onboarding/sesiones
+Authorization: Bearer {{authToken}}
+
+### 7. Crear evento en calendario
+POST {{baseUrl}}/calendario/eventos
+Authorization: Bearer {{authToken}}
+Content-Type: application/json
+
+{
+  "titulo": "Reunión Semanal",
+  "descripcion": "Revisión semanal de progreso",
+  "tipo": "reunion",
+  "fechaInicio": "2024-07-22",
+  "color": "#00448D"
+}
+
+### 8. Obtener vista mensual del calendario
+GET {{baseUrl}}/calendario/mes/2024/7
+Authorization: Bearer {{authToken}}
+
+### 9. Obtener estadísticas
+GET {{baseUrl}}/colaboradores/stats
+Authorization: Bearer {{authToken}}
+
+### 10. Listar notificaciones
+GET {{baseUrl}}/notificaciones
+Authorization: Bearer {{authToken}}
