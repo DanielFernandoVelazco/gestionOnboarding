@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
     format,
     startOfMonth,
@@ -9,7 +9,8 @@ import {
     startOfWeek,
     endOfWeek,
     isSameDay,
-    differenceInDays
+    differenceInDays,
+    addDays
 } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { OnboardingSesion } from 'src/services/onboarding.service';
@@ -35,6 +36,13 @@ interface CalendarEvent {
     duracion: number;
 }
 
+interface DayEvent {
+    event: CalendarEvent;
+    position: 'start' | 'middle' | 'end' | 'single';
+    dayIndex: number; // Índice del día en el mes
+    rowIndex: number; // Índice de la fila en la cuadrícula
+}
+
 const Calendar: React.FC<CalendarProps> = ({
     onEventClick,
     onSesionClick,
@@ -43,11 +51,10 @@ const Calendar: React.FC<CalendarProps> = ({
     initialDate = new Date(),
 }) => {
     const [currentDate, setCurrentDate] = useState<Date>(initialDate);
-    const [events, setEvents] = useState<CalendarEvent[]>([]);
 
     // Convertir sesiones en eventos para el calendario
-    useEffect(() => {
-        const calendarEvents: CalendarEvent[] = sesiones.map(sesion => {
+    const events = useMemo(() => {
+        return sesiones.map(sesion => {
             const startDate = new Date(sesion.fechaInicio);
             const endDate = new Date(sesion.fechaFin);
             const duracion = differenceInDays(endDate, startDate) + 1;
@@ -64,7 +71,6 @@ const Calendar: React.FC<CalendarProps> = ({
                 duracion,
             };
         });
-        setEvents(calendarEvents);
     }, [sesiones]);
 
     // Navegación
@@ -80,42 +86,89 @@ const Calendar: React.FC<CalendarProps> = ({
         setCurrentDate(new Date());
     };
 
-    // Obtener días del mes actual
+    // Calcular los días del calendario
     const monthStart = startOfMonth(currentDate);
     const monthEnd = endOfMonth(currentDate);
     const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
     const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
-    // Agrupar eventos por día para mostrar
-    const groupEventsByDay = () => {
-        const grouped: Record<string, CalendarEvent[]> = {};
+    // Organizar eventos por día y fila
+    const { eventsByDay, eventRows } = useMemo(() => {
+        const eventsByDay: Record<string, CalendarEvent[]> = {};
+        const eventRows: Record<string, number> = {};
+        const dayRows: Record<string, number[]> = {};
 
+        // Inicializar arrays para cada día
+        days.forEach((day, dayIndex) => {
+            const dateKey = day.toDateString();
+            eventsByDay[dateKey] = [];
+            dayRows[dateKey] = [];
+        });
+
+        // Procesar cada evento
         events.forEach(event => {
             const eventStart = new Date(event.startDate);
             const eventEnd = new Date(event.endDate);
-            const current = new Date(eventStart);
 
-            while (current <= eventEnd) {
+            // Asegurarse de que las fechas estén dentro del rango visible
+            const startDate = eventStart < calendarStart ? calendarStart : eventStart;
+            const endDate = eventEnd > calendarEnd ? calendarEnd : eventEnd;
+
+            let current = new Date(startDate);
+            while (current <= endDate) {
                 const dateKey = current.toDateString();
-                if (!grouped[dateKey]) {
-                    grouped[dateKey] = [];
-                }
-                // Solo agregar el evento una vez por día
-                if (current.getTime() === eventStart.getTime() ||
-                    !grouped[dateKey].some(e => e.id === event.id)) {
-                    grouped[dateKey].push(event);
+                if (eventsByDay[dateKey]) {
+                    eventsByDay[dateKey].push(event);
                 }
                 current.setDate(current.getDate() + 1);
             }
         });
 
-        return grouped;
-    };
+        // Asignar filas para evitar superposiciones
+        events.forEach(event => {
+            const eventStart = new Date(event.startDate);
+            const eventEnd = new Date(event.endDate);
+            const startDate = eventStart < calendarStart ? calendarStart : eventStart;
+            const endDate = eventEnd > calendarEnd ? calendarEnd : eventEnd;
 
-    const eventsByDay = groupEventsByDay();
+            let foundRow = false;
+            let rowIndex = 0;
 
-    // Determinar posición del evento en el rango de fechas
+            while (!foundRow) {
+                let conflict = false;
+                let current = new Date(startDate);
+
+                // Verificar si hay conflicto en esta fila
+                while (current <= endDate && !conflict) {
+                    const dateKey = current.toDateString();
+                    if (dayRows[dateKey]?.includes(rowIndex)) {
+                        conflict = true;
+                    }
+                    current.setDate(current.getDate() + 1);
+                }
+
+                if (!conflict) {
+                    foundRow = true;
+                    // Asignar la fila a todos los días del evento
+                    let current = new Date(startDate);
+                    while (current <= endDate) {
+                        const dateKey = current.toDateString();
+                        if (!dayRows[dateKey]) dayRows[dateKey] = [];
+                        dayRows[dateKey].push(rowIndex);
+                        eventRows[`${event.id}-${dateKey}`] = rowIndex;
+                        current.setDate(current.getDate() + 1);
+                    }
+                } else {
+                    rowIndex++;
+                }
+            }
+        });
+
+        return { eventsByDay, eventRows };
+    }, [events, days, calendarStart, calendarEnd]);
+
+    // Determinar posición del evento en un día específico
     const getEventPosition = (event: CalendarEvent, date: Date): 'start' | 'middle' | 'end' | 'single' => {
         const eventStart = new Date(event.startDate);
         const eventEnd = new Date(event.endDate);
@@ -189,6 +242,114 @@ const Calendar: React.FC<CalendarProps> = ({
         }
     };
 
+    // Calcular el margen superior para cada fila de eventos
+    const getEventTopPosition = (rowIndex: number): number => {
+        return 28 + (rowIndex * 24); // 28px para el número del día + n*24px para cada fila
+    };
+
+    // Renderizar barras de eventos continuas
+    const renderEventBar = (event: CalendarEvent, day: Date, dayIndex: number) => {
+        const position = getEventPosition(event, day);
+        const rowIndex = eventRows[`${event.id}-${day.toDateString()}`] || 0;
+        const topPosition = getEventTopPosition(rowIndex);
+        const estadoStyles = getEstadoStyles(event.estado);
+        const isStart = position === 'start' || position === 'single';
+        const isEnd = position === 'end' || position === 'single';
+        const isMiddle = position === 'middle';
+
+        // Solo renderizar el evento en su primer día
+        if (isStart) {
+            // Calcular ancho basado en duración
+            const startDayIndex = dayIndex;
+            let endDayIndex = startDayIndex;
+            let current = new Date(day);
+
+            while (current <= event.endDate && current <= calendarEnd) {
+                if (isSameDay(current, event.endDate) || current > calendarEnd) {
+                    break;
+                }
+                endDayIndex++;
+                current = addDays(current, 1);
+            }
+
+            const duration = Math.min(endDayIndex - startDayIndex + 1,
+                differenceInDays(event.endDate, event.startDate) + 1);
+
+            return (
+                <div
+                    key={`${event.id}-bar`}
+                    className={clsx(
+                        'absolute h-5 rounded-lg cursor-pointer transition-all hover:opacity-90',
+                        'truncate border shadow-sm',
+                        estadoStyles.bg,
+                        estadoStyles.border
+                    )}
+                    style={{
+                        top: `${topPosition}px`,
+                        left: '2px',
+                        right: '2px',
+                        width: `calc(${duration * 100}% - 4px)`,
+                        zIndex: 10 + rowIndex,
+                        borderLeft: `4px solid ${event.color}`,
+                        backgroundColor: `${event.color}20`, // color con opacidad
+                        borderColor: event.color,
+                    }}
+                    onClick={(e) => handleEventClick(event, e)}
+                    title={`${event.title}\n📅 ${format(event.startDate, 'dd/MM/yyyy')} - ${format(event.endDate, 'dd/MM/yyyy')} (${event.duracion} día${event.duracion !== 1 ? 's' : ''})\n🎯 ${event.tipo}\n📊 ${event.estado.toUpperCase()}`}
+                >
+                    <div className="flex items-center h-full px-2">
+                        <div className="flex items-center gap-1 flex-1 min-w-0">
+                            <div className="flex-shrink-0">
+                                <span className="material-symbols-outlined text-xs">
+                                    {event.estado === 'programada' ? 'schedule' :
+                                        event.estado === 'en_curso' ? 'play_circle' :
+                                            event.estado === 'completada' ? 'check_circle' :
+                                                'cancel'}
+                                </span>
+                            </div>
+                            <span className="text-xs font-medium truncate" style={{ color: event.color }}>
+                                {event.title}
+                            </span>
+                        </div>
+                        {isEnd && (
+                            <div className="flex-shrink-0 ml-1">
+                                <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: event.color }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        // Para días intermedios, solo mostrar la barra de fondo continua
+        if (isMiddle) {
+            return (
+                <div
+                    key={`${event.id}-${day.getDate()}-middle`}
+                    className={clsx(
+                        'absolute h-5 cursor-pointer',
+                        'border-t border-b'
+                    )}
+                    style={{
+                        top: `${topPosition}px`,
+                        left: '0',
+                        right: '0',
+                        height: '20px',
+                        zIndex: 9 + rowIndex,
+                        backgroundColor: `${event.color}15`,
+                        borderColor: event.color,
+                    }}
+                    onClick={(e) => handleEventClick(event, e)}
+                />
+            );
+        }
+
+        return null;
+    };
+
     // Nombres de los días
     const dayNames = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
     const monthNames = [
@@ -236,11 +397,11 @@ const Calendar: React.FC<CalendarProps> = ({
             </div>
 
             {/* Días de la semana */}
-            <div className="grid grid-cols-7 gap-px mb-2">
+            <div className="grid grid-cols-7 gap-px mb-2 bg-gray-200 dark:bg-gray-800 rounded-t-lg">
                 {dayNames.map((day, index) => (
                     <div
                         key={index}
-                        className="text-center py-2 text-xs font-medium text-gray-500 dark:text-gray-400"
+                        className="text-center py-2 text-xs font-medium text-gray-500 dark:text-gray-400 bg-white dark:bg-gray-900"
                     >
                         {day}
                     </div>
@@ -248,30 +409,31 @@ const Calendar: React.FC<CalendarProps> = ({
             </div>
 
             {/* Días del mes */}
-            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-lg overflow-hidden">
-                {days.map((day, index) => {
+            <div className="grid grid-cols-7 gap-px bg-gray-200 dark:bg-gray-800 rounded-b-lg overflow-hidden">
+                {days.map((day, dayIndex) => {
                     const isCurrentMonth = isSameMonth(day, currentDate);
                     const isCurrentDay = isToday(day);
                     const dayEvents = eventsByDay[day.toDateString()] || [];
 
                     return (
                         <div
-                            key={index}
+                            key={dayIndex}
                             className={clsx(
-                                'min-h-[120px] bg-white dark:bg-gray-900/50 p-2 relative transition-colors',
+                                'min-h-[140px] bg-white dark:bg-gray-900 relative transition-colors',
                                 !isCurrentMonth && 'bg-gray-50 dark:bg-gray-900/30',
                                 isCurrentDay && 'bg-blue-50 dark:bg-blue-900/20',
-                                'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer'
+                                'hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer',
+                                'border-r border-b border-gray-200 dark:border-gray-800 last:border-r-0'
                             )}
                             onClick={() => handleDayClick(day, dayEvents)}
                         >
                             {/* Número del día */}
-                            <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center justify-between p-2">
                                 <span
                                     className={clsx(
                                         'text-sm font-medium transition-colors',
                                         isCurrentDay
-                                            ? 'flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white'
+                                            ? 'flex items-center justify-center w-7 h-7 rounded-full bg-primary text-white'
                                             : !isCurrentMonth
                                                 ? 'text-gray-400 dark:text-gray-600'
                                                 : 'text-gray-700 dark:text-gray-300'
@@ -281,79 +443,28 @@ const Calendar: React.FC<CalendarProps> = ({
                                 </span>
 
                                 {dayEvents.length > 0 && (
-                                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-gray-600 dark:text-gray-400">
                                         {dayEvents.length}
                                     </span>
                                 )}
                             </div>
 
                             {/* Eventos para este día */}
-                            <div className="space-y-1 max-h-[80px] overflow-y-auto scrollbar-thin">
-                                {dayEvents.slice(0, 3).map((event) => {
-                                    const position = getEventPosition(event, day);
-                                    const isStart = position === 'start' || position === 'single';
-                                    const isEnd = position === 'end' || position === 'single';
-                                    const isMiddle = position === 'middle';
-                                    const estadoStyles = getEstadoStyles(event.estado);
+                            <div className="relative px-2">
+                                {dayEvents.map((event) =>
+                                    renderEventBar(event, day, dayIndex)
+                                )}
 
-                                    return (
-                                        <div
-                                            key={`${event.id}-${day.getDate()}`}
-                                            className={clsx(
-                                                'text-xs px-2 py-1 cursor-pointer transition-all hover:scale-[1.02]',
-                                                'truncate border',
-                                                position === 'single' && 'rounded-lg',
-                                                position === 'start' && 'rounded-l-lg rounded-r',
-                                                position === 'end' && 'rounded-r-lg rounded-l',
-                                                position === 'middle' && 'rounded-none',
-                                                estadoStyles.bg,
-                                                estadoStyles.text,
-                                                estadoStyles.border
-                                            )}
-                                            style={{
-                                                borderLeft: isStart ? `3px solid ${event.color}` : 'none',
-                                                borderRight: isEnd ? `3px solid ${event.color}` : 'none',
-                                                marginLeft: isStart ? '0' : '-1px',
-                                                marginRight: isEnd ? '0' : '-1px',
-                                            }}
-                                            onClick={(e) => handleEventClick(event, e)}
-                                            title={`${event.title}\n📅 ${format(event.startDate, 'dd/MM/yyyy')} - ${format(event.endDate, 'dd/MM/yyyy')} (${event.duracion} día${event.duracion !== 1 ? 's' : ''})\n🎯 ${event.tipo}\n📊 ${event.estado.toUpperCase()}`}
-                                        >
-                                            {isStart && (
-                                                <div className="flex items-center gap-1">
-                                                    <div
-                                                        className="w-2 h-2 rounded-full flex-shrink-0"
-                                                        style={{ backgroundColor: event.color }}
-                                                    />
-                                                    <span className="font-medium truncate">{event.title}</span>
-                                                </div>
-                                            )}
-
-                                            {isMiddle && !isStart && !isEnd && (
-                                                <div className="flex items-center">
-                                                    <div
-                                                        className="h-full w-full opacity-50"
-                                                        style={{ backgroundColor: event.color }}
-                                                    />
-                                                </div>
-                                            )}
-
-                                            {isEnd && !isStart && (
-                                                <div className="flex items-center justify-end">
-                                                    <span className="truncate text-right">{event.title}</span>
-                                                    <div
-                                                        className="w-2 h-2 rounded-full ml-1 flex-shrink-0"
-                                                        style={{ backgroundColor: event.color }}
-                                                    />
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-
-                                {dayEvents.length > 3 && (
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 px-2">
-                                        +{dayEvents.length - 3} más...
+                                {/* Mostrar mini indicadores para días con muchos eventos */}
+                                {dayEvents.length > 2 && (
+                                    <div className="absolute bottom-1 right-1 flex gap-1">
+                                        {[...new Set(dayEvents.slice(2, 5).map(e => e.color))].map((color, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="w-1.5 h-1.5 rounded-full"
+                                                style={{ backgroundColor: color }}
+                                            />
+                                        ))}
                                     </div>
                                 )}
                             </div>
