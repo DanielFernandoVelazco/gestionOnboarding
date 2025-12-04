@@ -41,4 +41,8 @@ export interface StatsResponse {
         departamento: string;
         count: number;
     }>;
+    porLugarAsignacion: Array<{
+        lugarAsignacion: string;
+        count: number;
+    }>;
 }
