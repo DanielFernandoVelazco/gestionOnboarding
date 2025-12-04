@@ -232,9 +232,208 @@ const CalendarioOnboardings = () => {
                 <Modal
                     isOpen={showSesionModal}
                     onClose={() => setShowSesionModal(false)}
-                    title={selectedSesion.titulo}
-                    size="lg" children={undefined}                >
-                    {/* ... (mantener el contenido del modal existente) ... */}
+                    title="Detalles de la Sesión"
+                    size="lg"
+                >
+                    <div className="space-y-6">
+                        {/* Información principal */}
+                        <div className="flex items-start gap-4">
+                            <div
+                                className="w-4 h-full rounded"
+                                style={{ backgroundColor: selectedSesion.tipo?.color || '#00448D' }}
+                            />
+                            <div className="flex-1">
+                                <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                    {selectedSesion.titulo}
+                                </h3>
+                                <p className="text-gray-600 dark:text-gray-400 mt-1">
+                                    {selectedSesion.descripcion || 'Sin descripción'}
+                                </p>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                                <span className={`badge ${getEstadoColor(selectedSesion.estado)} px-3 py-1`}>
+                                    {getEstadoTexto(selectedSesion.estado)}
+                                </span>
+                                {selectedSesion.tipo && (
+                                    <span className="text-xs font-medium px-2 py-1 rounded-full text-white"
+                                        style={{ backgroundColor: selectedSesion.tipo.color }}>
+                                        {selectedSesion.tipo.nombre}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Grid de información */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Fechas */}
+                            <div className="space-y-4">
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                        📅 Fechas
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Inicio:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {new Date(selectedSesion.fechaInicio).toLocaleDateString('es-ES', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Fin:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {new Date(selectedSesion.fechaFin).toLocaleDateString('es-ES', {
+                                                    weekday: 'long',
+                                                    year: 'numeric',
+                                                    month: 'long',
+                                                    day: 'numeric'
+                                                })}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Duración:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {(() => {
+                                                    const inicio = new Date(selectedSesion.fechaInicio);
+                                                    const fin = new Date(selectedSesion.fechaFin);
+                                                    const diffTime = Math.abs(fin.getTime() - inicio.getTime());
+                                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                                                    return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
+                                                })()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Ubicación y enlace */}
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                        📍 Ubicación
+                                    </h4>
+                                    <p className="text-gray-900 dark:text-white">
+                                        {selectedSesion.ubicacion || 'No especificada'}
+                                    </p>
+                                    {selectedSesion.enlaceVirtual && (
+                                        <a
+                                            href={selectedSesion.enlaceVirtual}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-1 text-primary hover:text-primary-hover text-sm mt-1"
+                                        >
+                                            <span className="material-symbols-outlined text-base">link</span>
+                                            Enlace virtual
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Capacidad y participantes */}
+                            <div className="space-y-4">
+                                <div>
+                                    <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                        👥 Participantes
+                                    </h4>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Capacidad:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {selectedSesion.capacidadMaxima} personas
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Inscritos:</span>
+                                            <span className="font-medium text-gray-900 dark:text-white">
+                                                {selectedSesion.participantes?.length || 0} personas
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">Disponibles:</span>
+                                            <span className="font-medium text-green-600 dark:text-green-400">
+                                                {selectedSesion.capacidadMaxima - (selectedSesion.participantes?.length || 0)} cupos
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Notas */}
+                                {selectedSesion.notas && (
+                                    <div>
+                                        <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
+                                            📝 Notas
+                                        </h4>
+                                        <p className="text-gray-900 dark:text-white text-sm bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                                            {selectedSesion.notas}
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Lista de participantes */}
+                        {selectedSesion.participantes && selectedSesion.participantes.length > 0 && (
+                            <div>
+                                <h4 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-3">
+                                    👤 Lista de Participantes ({selectedSesion.participantes.length})
+                                </h4>
+                                <div className="max-h-60 overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-800">
+                                    <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-800">
+                                        <thead className="bg-gray-50 dark:bg-gray-800/50">
+                                            <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                    Nombre
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                    Email
+                                                </th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400">
+                                                    Departamento
+                                                </th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-200 dark:divide-gray-800 bg-white dark:bg-gray-900/50">
+                                            {selectedSesion.participantes.map((participante: any, index: number) => (
+                                                <tr key={index}>
+                                                    <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                                                        {participante.nombreCompleto}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                                        {participante.email}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">
+                                                        {participante.departamento || '-'}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Botones de acción */}
+                        <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-800">
+                            <Button
+                                variant="secondary"
+                                onClick={() => setShowSesionModal(false)}
+                            >
+                                Cerrar
+                            </Button>
+                            <Button
+                                variant="primary"
+                                onClick={() => {
+                                    setShowSesionModal(false);
+                                    navigate(`/onboarding/editar/${selectedSesion.id}`);
+                                }}
+                            >
+                                <span className="material-symbols-outlined">edit</span>
+                                Editar Sesión
+                            </Button>
+                        </div>
+                    </div>
                 </Modal>
             )}
 
