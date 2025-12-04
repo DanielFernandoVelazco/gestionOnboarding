@@ -1,7 +1,7 @@
 import { IsOptional, IsString, IsEnum, IsBoolean, IsDate } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { EstadoOnboarding } from '../entities/colaborador.entity';
+import { EstadoOnboarding, LugarAsignacion } from '../entities/colaborador.entity';
 
 export class FilterColaboradorDto {
     @ApiProperty({
@@ -30,6 +30,15 @@ export class FilterColaboradorDto {
     @IsEnum(EstadoOnboarding)
     @IsOptional()
     estadoTecnico?: EstadoOnboarding;
+
+    @ApiProperty({
+        description: 'Filtrar por lugar de asignación',
+        enum: LugarAsignacion,
+        required: false,
+    })
+    @IsEnum(LugarAsignacion)
+    @IsOptional()
+    lugarAsignacion?: LugarAsignacion;
 
     @ApiProperty({
         description: 'Filtrar por departamento',
