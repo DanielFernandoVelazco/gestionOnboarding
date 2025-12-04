@@ -13,6 +13,8 @@ import TablaColaboradores from '../pages/Colaboradores/Tabla';
 import CalendarioOnboardings from '../pages/Onboarding/Calendario';
 import AlertasCorreo from '../pages/Notificaciones/Alertas';
 import NotFound from '../pages/NotFound';
+import AgendarOnboarding from '../pages/Onboarding/Agendar';
+import GestionOnboarding from '../pages/Onboarding/Gestion';
 
 // Componente para rutas protegidas
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
@@ -48,9 +50,14 @@ const AppRouter = () => {
                 </Route>
                 <Route path="onboarding">
                     <Route path="calendario" element={<CalendarioOnboardings />} />
+                    <Route path="agendar" element={<AgendarOnboarding />} />
                 </Route>
                 <Route path="notificaciones">
                     <Route path="alertas" element={<AlertasCorreo />} />
+                </Route>
+                <Route path="onboarding">
+                    <Route path="calendario" element={<CalendarioOnboardings />} />
+                    <Route path="gestion" element={<GestionOnboarding />} />
                 </Route>
             </Route>
 
