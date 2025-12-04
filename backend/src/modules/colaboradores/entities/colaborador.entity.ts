@@ -8,7 +8,7 @@ import {
     JoinColumn,
 } from 'typeorm';
 import { User } from '../../auth/entities/user.entity';
-import { OnboardingTipo } from 'src/modules/onboarding/entities/onboarding-tipo.entity';
+import { OnboardingTipo } from '../../onboarding/entities/onboarding-tipo.entity';
 
 export enum EstadoOnboarding {
     PENDIENTE = 'pendiente',
@@ -17,9 +17,12 @@ export enum EstadoOnboarding {
     CANCELADO = 'cancelado',
 }
 
-export enum TipoOnboarding {
-    BIENVENIDA = 'bienvenida',
-    TECNICO = 'tecnico',
+export enum LugarAsignacion {
+    JOURNEY_TO_CLOUD = 'journey_to_cloud',
+    CAPITULO_DATA = 'capitulo_data',
+    CAPITULO_FRONTEND = 'capitulo_frontend',
+    CAPITULO_BACKEND = 'capitulo_backend',
+    OTRO = 'otro',
 }
 
 @Entity('colaboradores')
@@ -61,6 +64,16 @@ export class Colaborador {
 
     @Column({ type: 'date', nullable: true })
     fechaOnboardingTecnico?: Date;
+
+    @Column({ type: 'date', nullable: true })
+    fechaAsignacionOnboarding?: Date;
+
+    @Column({
+        type: 'enum',
+        enum: LugarAsignacion,
+        nullable: true,
+    })
+    lugarAsignacion?: LugarAsignacion;
 
     @ManyToOne(() => OnboardingTipo, { nullable: true })
     @JoinColumn({ name: 'tipoOnboardingTecnicoId' })
