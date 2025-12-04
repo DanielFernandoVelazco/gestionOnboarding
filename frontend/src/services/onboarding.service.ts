@@ -196,11 +196,32 @@ export const onboardingService = {
         }
     },
 
-    // Sesiones por mes
-    getSesionesPorMes: async (año: number, mes: number): Promise<OnboardingSesion[]> => {
+
+    getAllSesiones: async (filters?: any) => {
         try {
-            const response = await api.get(`/onboarding/sesiones/mes/${año}/${mes}`);
+            const response = await api.get('/onboarding/sesiones', {
+                params: {
+                    limit: 100, // Obtener todas las sesiones
+                    ...filters
+                }
+            });
             return response.data;
+        } catch (error) {
+            console.error('Error al cargar todas las sesiones:', error);
+            return { data: [], meta: { total: 0 } };
+        }
+    },
+
+    // Sesiones por mes
+    getSesionesPorMes: async (año: number, mes: number, tipoId?: string) => {
+        try {
+            let url = `/onboarding/sesiones/mes/${año}/${mes}`;
+            if (tipoId) {
+                url += `?tipoId=${tipoId}`;
+            }
+
+            const response = await api.get(url);
+            return response.data || [];
         } catch (error) {
             console.error('Error al cargar sesiones por mes:', error);
             return [];
