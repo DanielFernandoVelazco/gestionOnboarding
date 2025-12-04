@@ -36,13 +36,6 @@ interface CalendarEvent {
     duracion: number;
 }
 
-interface DayEvent {
-    event: CalendarEvent;
-    position: 'start' | 'middle' | 'end' | 'single';
-    dayIndex: number; // Índice del día en el mes
-    rowIndex: number; // Índice de la fila en la cuadrícula
-}
-
 const Calendar: React.FC<CalendarProps> = ({
     onEventClick,
     onSesionClick,
@@ -98,6 +91,7 @@ const Calendar: React.FC<CalendarProps> = ({
         const eventsByDay: Record<string, CalendarEvent[]> = {};
         const eventRows: Record<string, number> = {};
         const dayRows: Record<string, number[]> = {};
+        const eventStartDays: Record<string, number> = {};
 
         // Inicializar arrays para cada día
         days.forEach((day, dayIndex) => {
@@ -168,17 +162,23 @@ const Calendar: React.FC<CalendarProps> = ({
         return { eventsByDay, eventRows };
     }, [events, days, calendarStart, calendarEnd]);
 
-    // Determinar posición del evento en un día específico
-    const getEventPosition = (event: CalendarEvent, date: Date): 'start' | 'middle' | 'end' | 'single' => {
+    // Determinar posición del evento en un día específico - VERSIÓN CORREGIDA
+    const getEventPosition = (event: CalendarEvent, date: Date): 'start' | 'middle' | 'end' | 'single' | 'none' => {
         const eventStart = new Date(event.startDate);
         const eventEnd = new Date(event.endDate);
 
-        eventStart.setHours(0, 0, 0, 0);
-        eventEnd.setHours(23, 59, 59, 999);
-        date.setHours(0, 0, 0, 0);
+        // Normalizar fechas (solo fecha, sin hora)
+        const normalizedStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
+        const normalizedEnd = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
+        const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
 
-        const isStart = isSameDay(date, eventStart);
-        const isEnd = isSameDay(date, eventEnd);
+        // Verificar si la fecha está dentro del intervalo
+        if (normalizedDate < normalizedStart || normalizedDate > normalizedEnd) {
+            return 'none';
+        }
+
+        const isStart = isSameDay(normalizedDate, normalizedStart);
+        const isEnd = isSameDay(normalizedDate, normalizedEnd);
 
         if (isStart && isEnd) return 'single';
         if (isStart) return 'start';
@@ -247,9 +247,11 @@ const Calendar: React.FC<CalendarProps> = ({
         return 28 + (rowIndex * 24); // 28px para el número del día + n*24px para cada fila
     };
 
-    // Renderizar barras de eventos continuas
+    // Renderizar barras de eventos continuas - VERSIÓN CORREGIDA
     const renderEventBar = (event: CalendarEvent, day: Date, dayIndex: number) => {
         const position = getEventPosition(event, day);
+        if (position === 'none') return null;
+
         const rowIndex = eventRows[`${event.id}-${day.toDateString()}`] || 0;
         const topPosition = getEventTopPosition(rowIndex);
         const estadoStyles = getEstadoStyles(event.estado);
@@ -257,41 +259,54 @@ const Calendar: React.FC<CalendarProps> = ({
         const isEnd = position === 'end' || position === 'single';
         const isMiddle = position === 'middle';
 
-        // Solo renderizar el evento en su primer día
+        // Solo renderizar la barra completa en el primer día o en días únicos
         if (isStart) {
-            // Calcular ancho basado en duración
-            const startDayIndex = dayIndex;
-            let endDayIndex = startDayIndex;
-            let current = new Date(day);
+            // Calcular cuántos días abarca el evento visible en el calendario
+            let visibleDuration = 1;
+            let currentIndex = dayIndex;
+            let currentDate = new Date(day);
 
-            while (current <= event.endDate && current <= calendarEnd) {
-                if (isSameDay(current, event.endDate) || current > calendarEnd) {
+            // Buscar hasta dónde llega el evento en el calendario visible
+            while (currentIndex < days.length - 1) {
+                const nextDate = days[currentIndex + 1];
+                const nextPosition = getEventPosition(event, nextDate);
+
+                if (nextPosition === 'none' || nextDate > event.endDate || nextDate > calendarEnd) {
                     break;
                 }
-                endDayIndex++;
-                current = addDays(current, 1);
+
+                visibleDuration++;
+                currentIndex++;
+                currentDate = nextDate;
             }
 
-            const duration = Math.min(endDayIndex - startDayIndex + 1,
-                differenceInDays(event.endDate, event.startDate) + 1);
+            // Asegurar que la duración sea al menos 1
+            const displayDuration = Math.max(1, visibleDuration);
+
+            // Calcular ancho basado en la duración visible
+            const widthPercentage = displayDuration * 100;
 
             return (
                 <div
-                    key={`${event.id}-bar`}
+                    key={`${event.id}-bar-${dayIndex}`}
                     className={clsx(
-                        'absolute h-5 rounded-lg cursor-pointer transition-all hover:opacity-90',
-                        'truncate border shadow-sm',
+                        'absolute h-5 cursor-pointer transition-all hover:opacity-90',
+                        'truncate shadow-sm',
                         estadoStyles.bg,
-                        estadoStyles.border
+                        estadoStyles.border,
+                        isStart && !isEnd && 'rounded-l-lg',
+                        isEnd && !isStart && 'rounded-r-lg',
+                        isStart && isEnd && 'rounded-lg', // single day
+                        !isStart && !isEnd && 'rounded-none' // middle days (no debería ocurrir aquí)
                     )}
                     style={{
                         top: `${topPosition}px`,
                         left: '2px',
-                        right: '2px',
-                        width: `calc(${duration * 100}% - 4px)`,
+                        width: `calc(${widthPercentage}% - 4px)`,
                         zIndex: 10 + rowIndex,
                         borderLeft: `4px solid ${event.color}`,
-                        backgroundColor: `${event.color}20`, // color con opacidad
+                        borderRight: isEnd ? `2px solid ${event.color}` : 'none',
+                        backgroundColor: `${event.color}20`,
                         borderColor: event.color,
                     }}
                     onClick={(e) => handleEventClick(event, e)}
@@ -300,6 +315,14 @@ const Calendar: React.FC<CalendarProps> = ({
                     <div className="flex items-center h-full px-2">
                         <div className="flex items-center gap-1 flex-1 min-w-0">
                             <div className="flex-shrink-0">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: event.color }} />
+                            </div>
+                            <span className="text-xs font-medium truncate ml-1" style={{ color: event.color }}>
+                                {event.title}
+                            </span>
+                        </div>
+                        {isEnd && (
+                            <div className="flex-shrink-0 ml-1">
                                 <span className="material-symbols-outlined text-xs">
                                     {event.estado === 'programada' ? 'schedule' :
                                         event.estado === 'en_curso' ? 'play_circle' :
@@ -307,44 +330,45 @@ const Calendar: React.FC<CalendarProps> = ({
                                                 'cancel'}
                                 </span>
                             </div>
-                            <span className="text-xs font-medium truncate" style={{ color: event.color }}>
-                                {event.title}
-                            </span>
-                        </div>
-                        {isEnd && (
-                            <div className="flex-shrink-0 ml-1">
-                                <div
-                                    className="w-2 h-2 rounded-full"
-                                    style={{ backgroundColor: event.color }}
-                                />
-                            </div>
                         )}
                     </div>
                 </div>
             );
         }
 
-        // Para días intermedios, solo mostrar la barra de fondo continua
-        if (isMiddle) {
-            return (
-                <div
-                    key={`${event.id}-${day.getDate()}-middle`}
-                    className={clsx(
-                        'absolute h-5 cursor-pointer',
-                        'border-t border-b'
-                    )}
-                    style={{
-                        top: `${topPosition}px`,
-                        left: '0',
-                        right: '0',
-                        height: '20px',
-                        zIndex: 9 + rowIndex,
-                        backgroundColor: `${event.color}15`,
-                        borderColor: event.color,
-                    }}
-                    onClick={(e) => handleEventClick(event, e)}
-                />
+        // Para días intermedios y finales que no son el inicio,
+        if (isMiddle || isEnd) {
+            // Verificar si ya hay una barra de inicio en este día
+            const hasStartBar = eventsByDay[day.toDateString()]?.some(e =>
+                e.id === event.id && (getEventPosition(e, day) === 'start' || getEventPosition(e, day) === 'single')
             );
+
+            if (!hasStartBar) {
+                return (
+                    <div
+                        key={`${event.id}-bg-${dayIndex}`}
+                        className={clsx(
+                            'absolute cursor-pointer',
+                            position === 'end' ? 'border-r' : ''
+                        )}
+                        style={{
+                            top: `${topPosition}px`,
+                            left: '0',
+                            right: '0',
+                            height: '20px',
+                            zIndex: 9 + rowIndex,
+                            backgroundColor: `${event.color}15`,
+                            borderTop: `1px solid ${event.color}30`,
+                            borderBottom: `1px solid ${event.color}30`,
+                            borderLeft: 'none',
+                            borderRight: position === 'end' ? `2px solid ${event.color}` : 'none',
+                            borderRadius: position === 'end' ? '0 4px 4px 0' : '0',
+                        }}
+                        onClick={(e) => handleEventClick(event, e)}
+                        title={`${event.title} (Continuación)`}
+                    />
+                );
+            }
         }
 
         return null;
