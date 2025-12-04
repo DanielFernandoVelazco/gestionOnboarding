@@ -5,12 +5,14 @@ export interface Colaborador {
     nombreCompleto: string;
     email: string;
     telefono?: string;
-    departamento?: string;
+    departamento: 'tecnologia' | 'recursos_humanos' | 'marketing' | 'ventas' | 'finanzas';
     puesto?: string;
     fechaIngreso: string;
     estadoBienvenida: 'pendiente' | 'en_progreso' | 'completado';
     estadoTecnico: 'pendiente' | 'en_progreso' | 'completado';
     fechaOnboardingTecnico?: string;
+    fechaAsignacionOnboarding?: string; // NUEVO
+    lugarAsignacion?: 'journey_to_cloud' | 'capitulo_data' | 'capitulo_frontend' | 'capitulo_backend' | 'otro'; // NUEVO
     tipoOnboardingTecnico?: {
         id: string;
         nombre: string;
@@ -22,6 +24,8 @@ export interface Colaborador {
     updatedAt: string;
 }
 
+export type LugarAsignacion = 'journey_to_cloud' | 'capitulo_data' | 'capitulo_frontend' | 'capitulo_backend' | 'otro';
+
 export interface CreateColaboradorDto {
     nombreCompleto: string;
     email: string;
@@ -32,6 +36,8 @@ export interface CreateColaboradorDto {
     estadoBienvenida?: 'pendiente' | 'en_progreso' | 'completado';
     estadoTecnico?: 'pendiente' | 'en_progreso' | 'completado';
     fechaOnboardingTecnico?: string;
+    fechaAsignacionOnboarding?: string;
+    lugarAsignacion?: LugarAsignacion;
     tipoOnboardingTecnicoId?: string;
     notas?: string;
     activo?: boolean;
@@ -41,6 +47,7 @@ export interface FilterColaboradoresDto {
     search?: string;
     estadoBienvenida?: 'pendiente' | 'en_progreso' | 'completado';
     estadoTecnico?: 'pendiente' | 'en_progreso' | 'completado';
+    lugarAsignacion?: 'journey_to_cloud' | 'capitulo_data' | 'capitulo_frontend' | 'capitulo_backend' | 'otro'; // NUEVO
     departamento?: string;
     activo?: boolean;
     fechaDesde?: string;
@@ -67,7 +74,11 @@ export const colaboradoresService = {
 
         Object.entries(filters).forEach(([key, value]) => {
             if (value !== undefined && value !== null && value !== '') {
-                params.append(key, String(value));
+                if (key === 'lugarAsignacion' && value === 'no_asignado') {
+                    params.append(key, '');
+                } else {
+                    params.append(key, String(value));
+                }
             }
         });
 
@@ -109,6 +120,7 @@ export const colaboradoresService = {
     bulkUpdate: async (ids: string[], data: {
         estadoBienvenida?: 'pendiente' | 'en_progreso' | 'completado';
         estadoTecnico?: 'pendiente' | 'en_progreso' | 'completado';
+        lugarAsignacion?: LugarAsignacion;
         activo?: boolean;
     }) => {
         const response = await api.post('/colaboradores/bulk-update', { ids, ...data });
