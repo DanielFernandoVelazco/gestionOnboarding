@@ -5,7 +5,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, FindOptionsWhere, In } from 'typeorm';
+import { Repository, Like, Between, FindOptionsWhere, In, IsNull } from 'typeorm';
 import { Colaborador, EstadoOnboarding } from './entities/colaborador.entity';
 import { CreateColaboradorDto } from './dto/create-colaborador.dto';
 import { UpdateColaboradorDto } from './dto/update-colaborador.dto';
@@ -71,14 +71,14 @@ export class ColaboradoresService {
             search,
             estadoBienvenida,
             estadoTecnico,
+            lugarAsignacion,
             departamento,
             activo,
             fechaDesde,
             fechaHasta,
-            // CORRECCIÓN: Asignamos valores por defecto para evitar 'undefined'
             page = 1,
             limit = 10,
-            sortBy = 'createdAt', // Asegúrate de que este campo exista en tu entidad, o usa 'fechaIngreso'
+            sortBy = 'createdAt',
             sortOrder = 'DESC',
         } = filterDto;
 
@@ -87,6 +87,7 @@ export class ColaboradoresService {
         // Filtros básicos
         if (estadoBienvenida) where.estadoBienvenida = estadoBienvenida;
         if (estadoTecnico) where.estadoTecnico = estadoTecnico;
+        if (lugarAsignacion) where.lugarAsignacion = lugarAsignacion;
         if (departamento) where.departamento = departamento;
         if (activo !== undefined) where.activo = activo;
 
@@ -268,6 +269,15 @@ export class ColaboradoresService {
             .orderBy('count', 'DESC')
             .getRawMany();
 
+        // Estadísticas por lugar de asignación
+        const lugares = await queryBuilder
+            .select('colaborador.lugarAsignacion', 'lugarAsignacion')
+            .addSelect('COUNT(colaborador.id)', 'count')
+            .where('colaborador.lugarAsignacion IS NOT NULL')
+            .groupBy('colaborador.lugarAsignacion')
+            .orderBy('count', 'DESC')
+            .getRawMany();
+
         return {
             total,
             activos,
@@ -278,6 +288,10 @@ export class ColaboradoresService {
             porDepartamento: departamentos.map((d) => ({
                 departamento: d.departamento,
                 count: parseInt(d.count),
+            })),
+            porLugarAsignacion: lugares.map((l) => ({
+                lugarAsignacion: l.lugarAsignacion,
+                count: parseInt(l.count),
             })),
         };
     }
