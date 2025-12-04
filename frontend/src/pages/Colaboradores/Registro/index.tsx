@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -15,18 +15,37 @@ const estados = [
     { value: 'completado', label: 'Completado' },
 ];
 
+const lugaresAsignacion = [
+    { value: 'journey_to_cloud', label: 'Journey to Cloud' },
+    { value: 'capitulo_data', label: 'Capítulo Data' },
+    { value: 'capitulo_frontend', label: 'Capítulo Frontend' },
+    { value: 'capitulo_backend', label: 'Capítulo Backend' },
+    { value: 'otro', label: 'Otro' },
+];
+
+const departamento = [
+    { value: 'tecnologia', label: 'Tecnología' },
+    { value: 'recursos_humanos', label: 'Recursos Humanos' },
+    { value: 'marketing', label: 'Marketing' },
+    { value: 'ventas', label: 'Ventas' },
+    { value: 'finanzas', label: 'Finanzas' },
+];
+
 const schema = z.object({
     nombreCompleto: z.string().min(3, 'El nombre debe tener al menos 3 caracteres'),
     email: z.string().email('Email inválido'),
     telefono: z.string().optional(),
-    departamento: z.string().optional(),
+    departamento: z.enum(['tecnologia', 'recursos_humanos', 'marketing', 'ventas', 'finanzas']).optional(),
     puesto: z.string().optional(),
     fechaIngreso: z.string().min(1, 'La fecha de ingreso es requerida'),
-    estadoBienvenida: z.enum(['pendiente', 'en_progreso', 'completado']),
-    estadoTecnico: z.enum(['pendiente', 'en_progreso', 'completado']),
+    estadoBienvenida: z.enum(['pendiente', 'en_progreso', 'completado']).optional(),
+    estadoTecnico: z.enum(['pendiente', 'en_progreso', 'completado']).optional(),
     fechaOnboardingTecnico: z.string().optional(),
+    fechaAsignacionOnboarding: z.string().optional(),
+    lugarAsignacion: z.enum(['journey_to_cloud', 'capitulo_data', 'capitulo_frontend', 'capitulo_backend', 'otro']).optional(), // NUEVO
     notas: z.string().optional(),
 });
+
 
 type FormData = z.infer<typeof schema>;
 
@@ -47,10 +66,7 @@ const RegistroColaboradores = () => {
         setValue,
     } = useForm<FormData>({
         resolver: zodResolver(schema),
-        defaultValues: {
-            estadoBienvenida: 'pendiente',
-            estadoTecnico: 'pendiente',
-        },
+        defaultValues: {},
     });
 
     // Cargar datos del colaborador si está en modo edición
@@ -71,17 +87,22 @@ const RegistroColaboradores = () => {
             const fechaOnboardingTecnico = colaborador.fechaOnboardingTecnico
                 ? colaborador.fechaOnboardingTecnico.split('T')[0]
                 : undefined;
+            const fechaAsignacionOnboarding = colaborador.fechaAsignacionOnboarding
+                ? colaborador.fechaAsignacionOnboarding.split('T')[0]
+                : undefined;
 
             // Establecer valores en el formulario
             setValue('nombreCompleto', colaborador.nombreCompleto);
             setValue('email', colaborador.email);
             setValue('telefono', colaborador.telefono || '');
-            setValue('departamento', colaborador.departamento || '');
+            setValue('departamento', colaborador.departamento);
             setValue('puesto', colaborador.puesto || '');
             setValue('fechaIngreso', fechaIngreso);
             setValue('estadoBienvenida', colaborador.estadoBienvenida);
             setValue('estadoTecnico', colaborador.estadoTecnico);
             setValue('fechaOnboardingTecnico', fechaOnboardingTecnico || '');
+            setValue('fechaAsignacionOnboarding', fechaAsignacionOnboarding || '');
+            setValue('lugarAsignacion', colaborador.lugarAsignacion);
             setValue('notas', colaborador.notas || '');
 
         } catch (err: any) {
@@ -100,13 +121,11 @@ const RegistroColaboradores = () => {
             if (isEditMode && editId) {
                 // Modo edición
                 await colaboradoresService.update(editId, data);
-                // Mostrar mensaje de éxito
                 alert('Colaborador actualizado exitosamente');
             } else {
                 // Modo creación
                 await colaboradoresService.create(data);
                 reset();
-                // Mostrar mensaje de éxito
                 alert('Colaborador creado exitosamente');
             }
 
@@ -204,7 +223,7 @@ const RegistroColaboradores = () => {
                                 placeholder="ejemplo@empresa.com"
                                 required
                                 icon={<span className="material-symbols-outlined">mail</span>}
-                                disabled={loadingData || isEditMode} // Email no editable en modo edición
+                                disabled={loadingData || isEditMode}
                             />
 
                             <Input
@@ -215,12 +234,14 @@ const RegistroColaboradores = () => {
                                 disabled={loadingData}
                             />
 
-                            <Input
+
+                            <Select
                                 label="Departamento"
                                 {...register('departamento')}
                                 error={errors.departamento?.message}
-                                placeholder="Tecnología"
+                                options={departamento}
                                 disabled={loadingData}
+                                helperText="Seleccione el tipo de departamento asignado"
                             />
 
                             <Input
@@ -243,21 +264,13 @@ const RegistroColaboradores = () => {
                         </div>
                     </div>
 
-                    {/* Detalles de Incorporación */}
+                    {/* Información de Onboarding Técnico */}
                     <div>
                         <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">
-                            Detalles de Incorporación
+                            Información de Onboarding Técnico
                         </h2>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Select
-                                label="Estado del Onboarding de Bienvenida"
-                                {...register('estadoBienvenida')}
-                                error={errors.estadoBienvenida?.message}
-                                options={estados}
-                                disabled={loadingData}
-                            />
-
                             <Select
                                 label="Estado del Onboarding Técnico"
                                 {...register('estadoTecnico')}
@@ -266,17 +279,34 @@ const RegistroColaboradores = () => {
                                 disabled={loadingData}
                             />
 
-                            <div className="md:col-span-2">
-                                <Input
-                                    label="Fecha de onboarding técnico (Opcional)"
-                                    type="date"
-                                    {...register('fechaOnboardingTecnico')}
-                                    error={errors.fechaOnboardingTecnico?.message}
-                                    helperText="Solo si ya está programado"
-                                    icon={<span className="material-symbols-outlined">event</span>}
-                                    disabled={loadingData}
-                                />
-                            </div>
+                            <Select
+                                label="Lugar de Asignación"
+                                {...register('lugarAsignacion')}
+                                error={errors.lugarAsignacion?.message}
+                                options={lugaresAsignacion}
+                                disabled={loadingData}
+                                helperText="Seleccione el tipo de onboarding asignado"
+                            />
+
+                            <Input
+                                label="Fecha de Asignación (Opcional)"
+                                type="date"
+                                {...register('fechaAsignacionOnboarding')}
+                                error={errors.fechaAsignacionOnboarding?.message}
+                                helperText="Fecha en que se asignó el onboarding"
+                                icon={<span className="material-symbols-outlined">event</span>}
+                                disabled={loadingData}
+                            />
+
+                            <Input
+                                label="Fecha de Onboarding Técnico (Opcional)"
+                                type="date"
+                                {...register('fechaOnboardingTecnico')}
+                                error={errors.fechaOnboardingTecnico?.message}
+                                helperText="Fecha programada para el onboarding técnico"
+                                icon={<span className="material-symbols-outlined">event</span>}
+                                disabled={loadingData}
+                            />
 
                             <div className="md:col-span-2">
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -294,6 +324,23 @@ const RegistroColaboradores = () => {
                                     </p>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    {/* Información de Onboarding de Bienvenida */}
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-200 border-b border-gray-200 dark:border-gray-700 pb-2 mb-4">
+                            Onboarding de Bienvenida
+                        </h2>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Select
+                                label="Estado del Onboarding de Bienvenida"
+                                {...register('estadoBienvenida')}
+                                error={errors.estadoBienvenida?.message}
+                                options={estados}
+                                disabled={loadingData}
+                            />
                         </div>
                     </div>
 
