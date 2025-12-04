@@ -11,7 +11,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
-import { EstadoOnboarding, TipoOnboarding } from '../entities/colaborador.entity';
+import { EstadoOnboarding, LugarAsignacion } from '../entities/colaborador.entity';
 
 export class CreateColaboradorDto {
     @ApiProperty({
@@ -122,4 +122,23 @@ export class CreateColaboradorDto {
     @IsBoolean()
     @IsOptional()
     activo?: boolean;
+
+    @ApiProperty({
+        description: 'Fecha en que se asignó el onboarding técnico (opcional)',
+        example: '2024-08-20',
+        required: false,
+    })
+    @IsOptional()
+    @IsDate()
+    @Type(() => Date)
+    fechaAsignacionOnboarding?: Date;
+
+    @ApiProperty({
+        description: 'Lugar de asignación del onboarding técnico (opcional)',
+        enum: LugarAsignacion,
+        required: false,
+    })
+    @IsOptional()
+    @IsEnum(LugarAsignacion)
+    lugarAsignacion?: LugarAsignacion;
 }
