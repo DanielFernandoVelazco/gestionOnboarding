@@ -28,7 +28,7 @@ const Dashboard = () => {
             const onboardingStats = await onboardingService.getStats();
 
             // Cargar sesiones próximas
-            const sesiones = await onboardingService.getSesionesProximas(3);
+            const sesiones = await onboardingService.getProximasSesiones(3);
 
             setStats({
                 colaboradores: {
