@@ -1,20 +1,25 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import {
-    format,
-    startOfMonth,
-    endOfMonth,
-    eachDayOfInterval,
-    isSameMonth,
-    isToday,
-    startOfWeek,
-    endOfWeek,
-    isSameDay,
-    differenceInDays,
-    addDays
-} from 'date-fns';
 import { es } from 'date-fns/locale';
 import { OnboardingSesion } from 'src/services/onboarding.service';
 import { clsx } from 'clsx';
+import {
+    parseDateFromBackend,
+    dateToBackendFormat,
+    formatDateForDisplay,
+    differenceInDays as diffInDaysUtils,
+    isSameDate,
+    isToday as isTodayUtils,
+    isPastDate,
+    isFutureDate,
+    addDays as addDaysUtils,
+    getTodayForBackend,
+    getTodayForInput,
+    dateToInputFormat,
+    formatDateLong,
+    getMonthYearString,
+    getShortDayNames,
+    getMonthNames
+} from '../../../utils/dateUtils';
 
 interface CalendarProps {
     onEventClick?: (evento: any) => void;
@@ -43,14 +48,18 @@ const Calendar: React.FC<CalendarProps> = ({
     sesiones = [],
     initialDate = new Date(),
 }) => {
+    // CORREGIDO: Usar parseDateFromBackend para la fecha actual
     const [currentDate, setCurrentDate] = useState<Date>(initialDate);
 
     // Convertir sesiones en eventos para el calendario
     const events = useMemo(() => {
         return sesiones.map(sesion => {
-            const startDate = new Date(sesion.fechaInicio);
-            const endDate = new Date(sesion.fechaFin);
-            const duracion = differenceInDays(endDate, startDate) + 1;
+            // CORREGIDO: Usar parseDateFromBackend
+            const startDate = parseDateFromBackend(sesion.fechaInicio);
+            const endDate = parseDateFromBackend(sesion.fechaFin);
+
+            // CORREGIDO: Usar differenceInDays de dateUtils
+            const duracion = diffInDaysUtils(startDate, endDate) + 1;
 
             return {
                 id: sesion.id,
@@ -66,24 +75,79 @@ const Calendar: React.FC<CalendarProps> = ({
         });
     }, [sesiones]);
 
-    // Navegación
+    // Navegación - CORREGIDO: Usar Date.UTC para evitar problemas de timezone
     const goToPreviousMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+        setCurrentDate(new Date(Date.UTC(
+            currentDate.getUTCFullYear(),
+            currentDate.getUTCMonth() - 1,
+            1
+        )));
     };
 
     const goToNextMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+        setCurrentDate(new Date(Date.UTC(
+            currentDate.getUTCFullYear(),
+            currentDate.getUTCMonth() + 1,
+            1
+        )));
     };
 
     const goToToday = () => {
-        setCurrentDate(new Date());
+        // CORREGIDO: Usar parseDateFromBackend con la fecha actual del backend
+        const todayBackend = getTodayForBackend();
+        setCurrentDate(parseDateFromBackend(todayBackend));
     };
 
-    // Calcular los días del calendario
-    const monthStart = startOfMonth(currentDate);
-    const monthEnd = endOfMonth(currentDate);
-    const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
-    const calendarEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
+    // Calcular los días del calendario - CORREGIDO: funciones personalizadas
+    const getStartOfMonth = (date: Date): Date => {
+        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+    };
+
+    const getEndOfMonth = (date: Date): Date => {
+        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0));
+    };
+
+    const getStartOfWeek = (date: Date): Date => {
+        const day = date.getUTCDay();
+        const diff = date.getUTCDate() - day + (day === 0 ? -6 : 1);
+        return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), diff));
+    };
+
+    const getEndOfWeek = (date: Date): Date => {
+        const start = getStartOfWeek(date);
+        return new Date(Date.UTC(
+            start.getUTCFullYear(),
+            start.getUTCMonth(),
+            start.getUTCDate() + 6
+        ));
+    };
+
+    const eachDayOfInterval = (interval: { start: Date, end: Date }): Date[] => {
+        const days: Date[] = [];
+        let current = new Date(interval.start);
+
+        while (current <= interval.end) {
+            days.push(new Date(current));
+            current = addDaysUtils(current, 1);
+        }
+
+        return days;
+    };
+
+    const isSameMonth = (date1: Date, date2: Date): boolean => {
+        return date1.getUTCFullYear() === date2.getUTCFullYear() &&
+            date1.getUTCMonth() === date2.getUTCMonth();
+    };
+
+    const isToday = (date: Date): boolean => {
+        return isTodayUtils(dateToBackendFormat(date));
+    };
+
+    // Calcular rangos
+    const monthStart = getStartOfMonth(currentDate);
+    const monthEnd = getEndOfMonth(currentDate);
+    const calendarStart = getStartOfWeek(monthStart);
+    const calendarEnd = getEndOfWeek(monthEnd);
     const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd });
 
     // Organizar eventos por día y fila
@@ -91,19 +155,18 @@ const Calendar: React.FC<CalendarProps> = ({
         const eventsByDay: Record<string, CalendarEvent[]> = {};
         const eventRows: Record<string, number> = {};
         const dayRows: Record<string, number[]> = {};
-        const eventStartDays: Record<string, number> = {};
 
         // Inicializar arrays para cada día
         days.forEach((day, dayIndex) => {
-            const dateKey = day.toDateString();
+            const dateKey = dateToBackendFormat(day); // CORREGIDO: Usar formato consistente
             eventsByDay[dateKey] = [];
             dayRows[dateKey] = [];
         });
 
         // Procesar cada evento
         events.forEach(event => {
-            const eventStart = new Date(event.startDate);
-            const eventEnd = new Date(event.endDate);
+            const eventStart = event.startDate;
+            const eventEnd = event.endDate;
 
             // Asegurarse de que las fechas estén dentro del rango visible
             const startDate = eventStart < calendarStart ? calendarStart : eventStart;
@@ -111,7 +174,7 @@ const Calendar: React.FC<CalendarProps> = ({
 
             let current = new Date(startDate);
             while (current <= endDate) {
-                const dateKey = current.toDateString();
+                const dateKey = dateToBackendFormat(current);
                 if (eventsByDay[dateKey]) {
                     eventsByDay[dateKey].push(event);
                 }
@@ -121,8 +184,8 @@ const Calendar: React.FC<CalendarProps> = ({
 
         // Asignar filas para evitar superposiciones
         events.forEach(event => {
-            const eventStart = new Date(event.startDate);
-            const eventEnd = new Date(event.endDate);
+            const eventStart = event.startDate;
+            const eventEnd = event.endDate;
             const startDate = eventStart < calendarStart ? calendarStart : eventStart;
             const endDate = eventEnd > calendarEnd ? calendarEnd : eventEnd;
 
@@ -135,7 +198,7 @@ const Calendar: React.FC<CalendarProps> = ({
 
                 // Verificar si hay conflicto en esta fila
                 while (current <= endDate && !conflict) {
-                    const dateKey = current.toDateString();
+                    const dateKey = dateToBackendFormat(current);
                     if (dayRows[dateKey]?.includes(rowIndex)) {
                         conflict = true;
                     }
@@ -147,7 +210,7 @@ const Calendar: React.FC<CalendarProps> = ({
                     // Asignar la fila a todos los días del evento
                     let current = new Date(startDate);
                     while (current <= endDate) {
-                        const dateKey = current.toDateString();
+                        const dateKey = dateToBackendFormat(current);
                         if (!dayRows[dateKey]) dayRows[dateKey] = [];
                         dayRows[dateKey].push(rowIndex);
                         eventRows[`${event.id}-${dateKey}`] = rowIndex;
@@ -162,28 +225,43 @@ const Calendar: React.FC<CalendarProps> = ({
         return { eventsByDay, eventRows };
     }, [events, days, calendarStart, calendarEnd]);
 
-    // Determinar posición del evento en un día específico - VERSIÓN CORREGIDA
+    // Determinar posición del evento en un día específico
     const getEventPosition = (event: CalendarEvent, date: Date): 'start' | 'middle' | 'end' | 'single' | 'none' => {
-        const eventStart = new Date(event.startDate);
-        const eventEnd = new Date(event.endDate);
+        const eventStart = event.startDate;
+        const eventEnd = event.endDate;
 
         // Normalizar fechas (solo fecha, sin hora)
-        const normalizedStart = new Date(eventStart.getFullYear(), eventStart.getMonth(), eventStart.getDate());
-        const normalizedEnd = new Date(eventEnd.getFullYear(), eventEnd.getMonth(), eventEnd.getDate());
-        const normalizedDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const normalizedStart = new Date(Date.UTC(
+            eventStart.getUTCFullYear(),
+            eventStart.getUTCMonth(),
+            eventStart.getUTCDate()
+        ));
+        const normalizedEnd = new Date(Date.UTC(
+            eventEnd.getUTCFullYear(),
+            eventEnd.getUTCMonth(),
+            eventEnd.getUTCDate()
+        ));
+        const normalizedDate = new Date(Date.UTC(
+            date.getUTCFullYear(),
+            date.getUTCMonth(),
+            date.getUTCDate()
+        ));
 
         // Verificar si la fecha está dentro del intervalo
         if (normalizedDate < normalizedStart || normalizedDate > normalizedEnd) {
             return 'none';
         }
 
-        const isStart = isSameDay(normalizedDate, normalizedStart);
-        const isEnd = isSameDay(normalizedDate, normalizedEnd);
+        const isStart = isSameDate(date, eventStart);
+        const isEnd = isSameDate(date, eventEnd);
 
         if (isStart && isEnd) return 'single';
         if (isStart) return 'start';
         if (isEnd) return 'end';
-        return 'middle';
+
+        // Verificar si está en el rango
+        if (date > eventStart && date < eventEnd) return 'middle';
+        return 'none';
     };
 
     // Obtener estilos para el estado
@@ -244,20 +322,30 @@ const Calendar: React.FC<CalendarProps> = ({
 
     // Calcular el margen superior para cada fila de eventos
     const getEventTopPosition = (rowIndex: number): number => {
-        return 28 + (rowIndex * 24); // 28px para el número del día + n*24px para cada fila
+        return 28 + (rowIndex * 24);
     };
 
-    // Renderizar barras de eventos continuas - VERSIÓN CORREGIDA
+    // Función para formatear fechas - CORREGIDO: Usar utilidades UTC
+    const formatDate = (date: Date, formatStr: string): string => {
+        const day = String(date.getUTCDate()).padStart(2, '0');
+        const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+        const year = date.getUTCFullYear();
+
+        if (formatStr === 'd') return String(date.getUTCDate());
+        if (formatStr === 'dd/MM/yyyy') return `${day}/${month}/${year}`;
+        return `${day}/${month}/${year}`;
+    };
+
+    // Renderizar barras de eventos continuas
     const renderEventBar = (event: CalendarEvent, day: Date, dayIndex: number) => {
         const position = getEventPosition(event, day);
         if (position === 'none') return null;
 
-        const rowIndex = eventRows[`${event.id}-${day.toDateString()}`] || 0;
+        const rowIndex = eventRows[`${event.id}-${dateToBackendFormat(day)}`] || 0;
         const topPosition = getEventTopPosition(rowIndex);
         const estadoStyles = getEstadoStyles(event.estado);
         const isStart = position === 'start' || position === 'single';
         const isEnd = position === 'end' || position === 'single';
-        const isMiddle = position === 'middle';
 
         // Solo renderizar la barra completa en el primer día o en días únicos
         if (isStart) {
@@ -296,8 +384,8 @@ const Calendar: React.FC<CalendarProps> = ({
                         estadoStyles.border,
                         isStart && !isEnd && 'rounded-l-lg',
                         isEnd && !isStart && 'rounded-r-lg',
-                        isStart && isEnd && 'rounded-lg', // single day
-                        !isStart && !isEnd && 'rounded-none' // middle days (no debería ocurrir aquí)
+                        isStart && isEnd && 'rounded-lg',
+                        !isStart && !isEnd && 'rounded-none'
                     )}
                     style={{
                         top: `${topPosition}px`,
@@ -310,7 +398,7 @@ const Calendar: React.FC<CalendarProps> = ({
                         borderColor: event.color,
                     }}
                     onClick={(e) => handleEventClick(event, e)}
-                    title={`${event.title}\n📅 ${format(event.startDate, 'dd/MM/yyyy')} - ${format(event.endDate, 'dd/MM/yyyy')} (${event.duracion} día${event.duracion !== 1 ? 's' : ''})\n🎯 ${event.tipo}\n📊 ${event.estado.toUpperCase()}`}
+                    title={`${event.title}\n📅 ${formatDate(event.startDate, 'dd/MM/yyyy')} - ${formatDate(event.endDate, 'dd/MM/yyyy')} (${event.duracion} día${event.duracion !== 1 ? 's' : ''})\n🎯 ${event.tipo}\n📊 ${event.estado.toUpperCase()}`}
                 >
                     <div className="flex items-center h-full px-2">
                         <div className="flex items-center gap-1 flex-1 min-w-0">
@@ -336,10 +424,11 @@ const Calendar: React.FC<CalendarProps> = ({
             );
         }
 
-        // Para días intermedios y finales que no son el inicio,
-        if (isMiddle || isEnd) {
+        // Para días intermedios y finales que no son el inicio
+        if (position === 'middle' || position === 'end') {
             // Verificar si ya hay una barra de inicio en este día
-            const hasStartBar = eventsByDay[day.toDateString()]?.some(e =>
+            const dateKey = dateToBackendFormat(day);
+            const hasStartBar = eventsByDay[dateKey]?.some(e =>
                 e.id === event.id && (getEventPosition(e, day) === 'start' || getEventPosition(e, day) === 'single')
             );
 
@@ -374,12 +463,9 @@ const Calendar: React.FC<CalendarProps> = ({
         return null;
     };
 
-    // Nombres de los días
-    const dayNames = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
-    const monthNames = [
-        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
-    ];
+    // Usar utilidades de dateUtils para nombres
+    const dayNames = getShortDayNames();
+    const monthNames = getMonthNames();
 
     return (
         <div className="w-full">
@@ -395,7 +481,7 @@ const Calendar: React.FC<CalendarProps> = ({
                     </button>
 
                     <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                        {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+                        {monthNames[currentDate.getUTCMonth()]} {currentDate.getUTCFullYear()}
                     </h2>
 
                     <button
@@ -437,7 +523,7 @@ const Calendar: React.FC<CalendarProps> = ({
                 {days.map((day, dayIndex) => {
                     const isCurrentMonth = isSameMonth(day, currentDate);
                     const isCurrentDay = isToday(day);
-                    const dayEvents = eventsByDay[day.toDateString()] || [];
+                    const dayEvents = eventsByDay[dateToBackendFormat(day)] || [];
 
                     return (
                         <div
@@ -463,7 +549,7 @@ const Calendar: React.FC<CalendarProps> = ({
                                                 : 'text-gray-700 dark:text-gray-300'
                                     )}
                                 >
-                                    {format(day, 'd')}
+                                    {formatDate(day, 'd')}
                                 </span>
 
                                 {dayEvents.length > 0 && (
