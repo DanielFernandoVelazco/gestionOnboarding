@@ -6,6 +6,19 @@ import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import { onboardingService, OnboardingSesion } from '../../../services/onboarding.service';
 import { useToast } from '../../../contexts/ToastContext';
+import {
+    parseDateFromBackend,
+    dateToInputFormat,
+    getTodayForBackend,
+    isSameDate,
+    isPastDate,
+    isFutureDate,
+    addDays,
+    differenceInDays,
+    formatDateForDisplay,
+    formatDateLong,
+    isValidDate
+} from '../../../utils/dateUtils';
 
 const CalendarioOnboardings = () => {
     const navigate = useNavigate();
@@ -121,8 +134,8 @@ const CalendarioOnboardings = () => {
         console.log('Día clickeado:', date);
         // Mostrar sesiones para ese día
         const sesionesDelDia = sesiones.filter(sesion => {
-            const fechaSesion = new Date(sesion.fechaInicio);
-            return fechaSesion.toDateString() === date.toDateString();
+            const fechaSesion = parseDateFromBackend(sesion.fechaInicio);
+            return isSameDate(fechaSesion, date);
         });
 
         if (sesionesDelDia.length > 0) {
@@ -130,14 +143,16 @@ const CalendarioOnboardings = () => {
             handleSesionClick(sesionesDelDia[0]);
         } else {
             // Si no hay sesiones, sugerir crear una
+            const today = parseDateFromBackend(getTodayForBackend());
+
             showToast({
                 title: 'No hay sesiones programadas',
-                message: `¿Deseas crear una sesión para el ${date.toLocaleDateString('es-ES')}?`,
+                message: `¿Deseas crear una sesión para el ${formatDateLong(dateToInputFormat(date))}?`,
                 type: 'info',
                 action: {
                     label: 'Crear sesión',
                     onClick: () => navigate('/onboarding/agendar', {
-                        state: { fechaInicio: date.toISOString().split('T')[0] }
+                        state: { fechaInicio: dateToInputFormat(date) }
                     })
                 }
             });
@@ -275,33 +290,22 @@ const CalendarioOnboardings = () => {
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Inicio:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">
-                                                {new Date(selectedSesion.fechaInicio).toLocaleDateString('es-ES', {
-                                                    weekday: 'long',
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric'
-                                                })}
+                                                {formatDateLong(selectedSesion.fechaInicio)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Fin:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">
-                                                {new Date(selectedSesion.fechaFin).toLocaleDateString('es-ES', {
-                                                    weekday: 'long',
-                                                    year: 'numeric',
-                                                    month: 'long',
-                                                    day: 'numeric'
-                                                })}
+                                                {formatDateLong(selectedSesion.fechaFin)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Duración:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">
                                                 {(() => {
-                                                    const inicio = new Date(selectedSesion.fechaInicio);
-                                                    const fin = new Date(selectedSesion.fechaFin);
-                                                    const diffTime = Math.abs(fin.getTime() - inicio.getTime());
-                                                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+                                                    const inicio = parseDateFromBackend(selectedSesion.fechaInicio);
+                                                    const fin = parseDateFromBackend(selectedSesion.fechaFin);
+                                                    const diffDays = differenceInDays(inicio, fin) + 1;
                                                     return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
                                                 })()}
                                             </span>
@@ -605,8 +609,8 @@ const CalendarioOnboardings = () => {
                                         </h4>
                                         <div className="flex items-center gap-4 mt-1">
                                             <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                {new Date(sesion.fechaInicio).toLocaleDateString('es-ES')} -
-                                                {new Date(sesion.fechaFin).toLocaleDateString('es-ES')}
+                                                {formatDateForDisplay(sesion.fechaInicio)} -
+                                                {formatDateForDisplay(sesion.fechaFin)}
                                             </p>
                                             <p className="text-sm text-gray-500 dark:text-gray-400">
                                                 • {sesion.participantes?.length || 0} participantes
