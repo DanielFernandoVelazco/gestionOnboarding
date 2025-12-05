@@ -11,6 +11,17 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Modal from '../../../components/ui/Modal';
 import { useToast } from '../../../contexts/ToastContext';
+import {
+    formatDateForInput,
+    formatDateForBackend,
+    isValidDate,
+    parseDateFromBackend,
+    dateToBackendFormat,
+    addDays,
+    differenceInDaysString,
+    formatDateForDisplay,
+    getTodayForBackend
+} from '../../../utils/dateUtils';
 
 // NO usar tipos estáticos - obtener desde API
 const estados = [
@@ -20,26 +31,33 @@ const estados = [
     { value: 'cancelada', label: 'Cancelada' },
 ];
 
-// Validación actualizada
+// Esquema de validación mejorado
 const schema = z.object({
     titulo: z.string().min(3, 'El título debe tener al menos 3 caracteres'),
     descripcion: z.string().optional(),
     tipoId: z.string().uuid('Debe seleccionar un tipo de onboarding válido'),
-    fechaInicio: z.string().min(1, 'La fecha de inicio es requerida'),
-    fechaFin: z.string().min(1, 'La fecha de fin es requerida'),
-    estado: z.enum(['programada', 'en_curso', 'completada', 'cancelada']).default('programada'),
-    capacidadMaxima: z.coerce.number().min(1, 'La capacidad debe ser al menos 1').default(1),
+    fechaInicio: z.string().min(1).refine(isValidDate, { message: 'Fecha inválida' }),
+    fechaFin: z.string().min(1).refine(isValidDate, { message: 'Fecha inválida' }),
+    estado: z.enum(['programada', 'en_curso', 'completada', 'cancelada']),
+    capacidadMaxima: z.number()
+        .min(1, 'La capacidad mínima es 1')
+        .max(100, 'La capacidad máxima es 100'),
     ubicacion: z.string().optional(),
-    enlaceVirtual: z.string().url('URL inválida').optional().or(z.literal('')),
+    enlaceVirtual: z.string().optional(),
     notas: z.string().optional(),
     participantesIds: z.array(z.string()).optional(),
-}).refine((data) => {
-    if (!data.fechaInicio || !data.fechaFin) return true;
-    return new Date(data.fechaInicio) <= new Date(data.fechaFin);
-}, {
-    message: 'La fecha de inicio debe ser anterior o igual a la fecha de fin',
-    path: ['fechaFin'],
-});
+}).refine(
+    (data) => {
+        // Usar parseDateFromBackend para evitar problemas de timezone
+        const inicio = parseDateFromBackend(data.fechaInicio);
+        const fin = parseDateFromBackend(data.fechaFin);
+        return inicio <= fin;
+    },
+    {
+        message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
+        path: ['fechaFin'],
+    }
+);
 
 type FormData = z.infer<typeof schema>;
 
@@ -65,6 +83,10 @@ const AgendarOnboarding = () => {
         defaultValues: {
             estado: 'programada',
             capacidadMaxima: 1,
+            // Establecer fecha de inicio como hoy (en formato YYYY-MM-DD)
+            fechaInicio: getTodayForBackend(),
+            // Establecer fecha de fin como mañana (en formato YYYY-MM-DD)
+            fechaFin: dateToBackendFormat(addDays(parseDateFromBackend(getTodayForBackend()), 1))
         },
     });
 
@@ -87,7 +109,11 @@ const AgendarOnboarding = () => {
             setColaboradores(Array.isArray(colaboradoresData.data) ? colaboradoresData.data : []);
         } catch (error) {
             console.error('Error al cargar datos:', error);
-            showToast('Error al cargar datos', 'error');
+            showToast({
+                title: 'Error al cargar datos',
+                message: 'No se pudieron cargar los tipos de onboarding o colaboradores',
+                type: 'error'
+            });
         }
     };
 
@@ -103,17 +129,28 @@ const AgendarOnboarding = () => {
 
             const formData = {
                 ...data,
+                // Usar formatDateForBackend para asegurar el formato correcto
+                fechaInicio: formatDateForBackend(data.fechaInicio),
+                fechaFin: formatDateForBackend(data.fechaFin),
                 participantesIds: selectedParticipants.length > 0 ? selectedParticipants : undefined,
             };
 
             console.log('Enviando datos:', formData); // Para depuración
 
             await onboardingService.createSesion(formData);
-            showToast('Sesión de onboarding creada exitosamente', 'success');
+            showToast({
+                title: 'Éxito',
+                message: 'Sesión de onboarding creada exitosamente',
+                type: 'success'
+            });
             navigate('/onboarding/calendario');
         } catch (error: any) {
             console.error('Error al crear sesión:', error);
-            showToast(error.message || error.response?.data?.message || 'Error al crear la sesión', 'error');
+            showToast({
+                title: 'Error',
+                message: error.message || error.response?.data?.message || 'Error al crear la sesión',
+                type: 'error'
+            });
         } finally {
             setLoading(false);
         }
@@ -125,7 +162,11 @@ const AgendarOnboarding = () => {
                 return prev.filter(id => id !== colaboradorId);
             } else {
                 if (prev.length >= capacidadMaxima) {
-                    showToast(`Capacidad máxima: ${capacidadMaxima} participantes`, 'warning');
+                    showToast({
+                        title: 'Capacidad máxima alcanzada',
+                        message: `Solo se pueden seleccionar ${capacidadMaxima} participantes`,
+                        type: 'warning'
+                    });
                     return prev;
                 }
                 return [...prev, colaboradorId];
@@ -150,6 +191,9 @@ const AgendarOnboarding = () => {
 
     // Tipo seleccionado para mostrar información
     const tipoSeleccionado = tipos.find(t => t.id === tipoId);
+
+    // Calcular min date para fechaFin basado en fechaInicio
+    const minDateForFin = fechaInicio;
 
     return (
         <div className="space-y-6">
@@ -300,14 +344,21 @@ const AgendarOnboarding = () => {
                         </div>
                     )}
 
-                    <Input
-                        label="Descripción (opcional)"
-                        {...register('descripcion')}
-                        error={errors.descripcion?.message}
-                        placeholder="Descripción detallada de la sesión..."
-                        as="textarea"
-                        rows={3}
-                    />
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            Descripción (opcional)
+                        </label>
+                        <textarea
+                            {...register('descripcion')}
+                            className="input-field min-h-[100px] resize-none"
+                            placeholder="Describe los objetivos y contenido de la sesión..."
+                        />
+                        {errors.descripcion?.message && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                {errors.descripcion.message}
+                            </p>
+                        )}
+                    </div>
 
                     {/* Fechas y Capacidad */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -317,6 +368,12 @@ const AgendarOnboarding = () => {
                             {...register('fechaInicio')}
                             error={errors.fechaInicio?.message}
                             required
+                            // Asegurar formato correcto para input type="date"
+                            value={fechaInicio ? formatDateForInput(fechaInicio) : ''}
+                            onChange={(e) => {
+                                const formattedDate = formatDateForBackend(e.target.value);
+                                setValue('fechaInicio', formattedDate, { shouldValidate: true });
+                            }}
                         />
 
                         <Input
@@ -324,14 +381,20 @@ const AgendarOnboarding = () => {
                             type="date"
                             {...register('fechaFin')}
                             error={errors.fechaFin?.message}
-                            min={fechaInicio}
+                            min={minDateForFin}
                             required
+                            // Asegurar formato correcto para input type="date"
+                            value={watch('fechaFin') ? formatDateForInput(watch('fechaFin')) : ''}
+                            onChange={(e) => {
+                                const formattedDate = formatDateForBackend(e.target.value);
+                                setValue('fechaFin', formattedDate, { shouldValidate: true });
+                            }}
                         />
 
                         <Input
                             label="Capacidad máxima"
                             type="number"
-                            {...register('capacidadMaxima')}
+                            {...register('capacidadMaxima', { valueAsNumber: true })}
                             error={errors.capacidadMaxima?.message}
                             min={1}
                             required
