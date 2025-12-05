@@ -1,3 +1,11 @@
+import {
+    formatDateForBackend,
+    parseDateFromBackend,
+    dateToBackendFormat,
+    getTodayForBackend,
+    addDays,
+    addDaysToDateString
+} from '../utils/dateUtils';
 import api from '../api/axios.config';
 import { PaginatedResponse } from './colaboradores.service';
 
@@ -99,7 +107,14 @@ export const onboardingService = {
             throw new Error('El tipoId debe ser un UUID válido');
         }
 
-        const response = await api.post('/onboarding/sesiones', data);
+        // Asegurar que las fechas estén en formato correcto
+        const datosEnviar = {
+            ...data,
+            fechaInicio: formatDateForBackend(data.fechaInicio),
+            fechaFin: formatDateForBackend(data.fechaFin),
+        };
+
+        const response = await api.post('/onboarding/sesiones', datosEnviar);
         return response.data;
     },
 
@@ -131,16 +146,30 @@ export const onboardingService = {
             return response.data;
         } catch (error) {
             console.error('Error al cargar próximas sesiones:', error);
-            // Datos de ejemplo para desarrollo
+
+            // Datos de ejemplo para desarrollo - usando dateUtil
             const tipos = await onboardingService.getTipos();
+
+            // Obtener fecha actual en formato UTC
+            const hoy = getTodayForBackend();
+
+            // Crear fechas usando dateUtil
+            const fechaInicio1 = addDaysToDateString(hoy, 2);
+            const fechaFin1 = addDaysToDateString(hoy, 5);
+            const fechaInicio2 = addDaysToDateString(hoy, 5);
+            const fechaFin2 = addDaysToDateString(hoy, 7);
+
+            // Crear objetos Date para createdAt/updatedAt usando parseDateFromBackend
+            const fechaCreacion = parseDateFromBackend(hoy);
+
             return [
                 {
                     id: '1',
                     titulo: 'Journey to Cloud - Cohort 1',
                     descripcion: 'Sesión intensiva de onboarding para desarrolladores Cloud',
                     tipo: tipos.find(t => t.nombre === 'Journey to Cloud') || tipos[0],
-                    fechaInicio: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 días
-                    fechaFin: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 días
+                    fechaInicio: `${fechaInicio1}T09:00:00.000Z`,
+                    fechaFin: `${fechaFin1}T17:00:00.000Z`,
                     estado: 'programada',
                     capacidadMaxima: 20,
                     ubicacion: 'Sala de Conferencias A',
@@ -151,16 +180,16 @@ export const onboardingService = {
                         { id: 'p2', nombreCompleto: 'Ana García', email: 'ana@example.com' },
                     ],
                     activo: true,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+                    createdAt: fechaCreacion.toISOString(),
+                    updatedAt: fechaCreacion.toISOString(),
                 },
                 {
                     id: '2',
                     titulo: 'Capítulo Frontend - Introducción a React',
                     descripcion: 'Sesión de onboarding para desarrolladores Frontend',
                     tipo: tipos.find(t => t.nombre === 'Capítulo Frontend') || tipos[0],
-                    fechaInicio: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(), // 5 días
-                    fechaFin: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 días
+                    fechaInicio: `${fechaInicio2}T10:00:00.000Z`,
+                    fechaFin: `${fechaFin2}T18:00:00.000Z`,
                     estado: 'programada',
                     capacidadMaxima: 15,
                     ubicacion: 'Sala de Capacitación B',
@@ -170,13 +199,12 @@ export const onboardingService = {
                         { id: 'p3', nombreCompleto: 'Laura Rodríguez', email: 'laura@example.com' },
                     ],
                     activo: true,
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
+                    createdAt: fechaCreacion.toISOString(),
+                    updatedAt: fechaCreacion.toISOString(),
                 },
             ];
         }
     },
-
 
     // Todas las sesiones con filtros
     getSesiones: async (filters?: {
@@ -188,23 +216,52 @@ export const onboardingService = {
         limit?: number;
     }): Promise<PaginatedResponse<OnboardingSesion>> => {
         try {
-            const response = await api.get('/onboarding/sesiones', { params: filters });
+            // Formatear fechas para el backend si existen
+            const params: any = { ...filters };
+
+            if (params.fechaDesde) {
+                params.fechaDesde = formatDateForBackend(params.fechaDesde);
+            }
+
+            if (params.fechaHasta) {
+                params.fechaHasta = formatDateForBackend(params.fechaHasta);
+            }
+
+            const response = await api.get('/onboarding/sesiones', { params });
             return response.data;
         } catch (error) {
             console.error('Error al cargar sesiones:', error);
-            return { data: [], meta: { total: 0, page: 1, limit: 10, totalPages: 0, hasNextPage: false, hasPreviousPage: false } };
+            return {
+                data: [],
+                meta: {
+                    total: 0,
+                    page: 1,
+                    limit: 10,
+                    totalPages: 0,
+                    hasNextPage: false,
+                    hasPreviousPage: false
+                }
+            };
         }
     },
 
-
     getAllSesiones: async (filters?: any) => {
         try {
-            const response = await api.get('/onboarding/sesiones', {
-                params: {
-                    limit: 100, // Obtener todas las sesiones
-                    ...filters
-                }
-            });
+            // Formatear fechas para el backend si existen
+            const params: any = {
+                limit: 100, // Obtener todas las sesiones
+                ...filters
+            };
+
+            if (params.fechaDesde) {
+                params.fechaDesde = formatDateForBackend(params.fechaDesde);
+            }
+
+            if (params.fechaHasta) {
+                params.fechaHasta = formatDateForBackend(params.fechaHasta);
+            }
+
+            const response = await api.get('/onboarding/sesiones', { params });
             return response.data;
         } catch (error) {
             console.error('Error al cargar todas las sesiones:', error);
@@ -230,8 +287,13 @@ export const onboardingService = {
 
     // Obtener sesión por ID
     getSesionById: async (id: string): Promise<OnboardingSesion> => {
-        const response = await api.get(`/onboarding/sesiones/${id}`);
-        return response.data;
+        try {
+            const response = await api.get(`/onboarding/sesiones/${id}`);
+            return response.data;
+        } catch (error) {
+            console.error('Error al cargar sesión:', error);
+            throw error;
+        }
     },
 
     // Actualizar sesión
@@ -247,7 +309,16 @@ export const onboardingService = {
         enlaceVirtual?: string;
         notas?: string;
     }>): Promise<OnboardingSesion> => {
-        const response = await api.put(`/onboarding/sesiones/${id}`, data);
+        // Asegurarse de que las fechas estén en formato correcto usando dateUtil
+        const datosEnviar = {
+            ...data,
+            fechaInicio: formatDateForBackend(data.fechaInicio || ''),
+            fechaFin: formatDateForBackend(data.fechaFin || ''),
+        };
+
+        console.log('Enviando al backend:', datosEnviar);
+
+        const response = await api.put(`/onboarding/sesiones/${id}`, datosEnviar);
         return response.data;
     },
 
@@ -269,8 +340,4 @@ export const onboardingService = {
         const response = await api.put(`/onboarding/sesiones/${sesionId}/estado`, { estado });
         return response.data;
     },
-
-
-
 };
-
