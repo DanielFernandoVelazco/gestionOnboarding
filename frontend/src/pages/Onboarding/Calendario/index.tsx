@@ -1,24 +1,15 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+// Importaciones de date-fns
+import { format, parse, differenceInDays, isSameDay, startOfDay } from 'date-fns';
+import { es } from 'date-fns/locale';
+
 import Calendar from '../../../components/shared/Calendar';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Modal from '../../../components/ui/Modal';
 import { onboardingService, OnboardingSesion } from '../../../services/onboarding.service';
 import { useToast } from '../../../contexts/ToastContext';
-import {
-    parseDateFromBackend,
-    dateToInputFormat,
-    getTodayForBackend,
-    isSameDate,
-    isPastDate,
-    isFutureDate,
-    addDays,
-    differenceInDays,
-    formatDateForDisplay,
-    formatDateLong,
-    isValidDate
-} from '../../../utils/dateUtils';
 
 const CalendarioOnboardings = () => {
     const navigate = useNavigate();
@@ -30,26 +21,63 @@ const CalendarioOnboardings = () => {
     const [error, setError] = useState<string | null>(null);
     const [stats, setStats] = useState<any>(null);
     const [proximasSesiones, setProximasSesiones] = useState<OnboardingSesion[]>([]);
-    const [showAgendarModal, setShowAgendarModal] = useState(false);
+    const [showAgendarModal, setShowAgendarModal] = useState(false); // Nota: Esta variable no se estaba usando en el render, pero la mantengo
     const [selectedSesion, setSelectedSesion] = useState<OnboardingSesion | null>(null);
     const [showSesionModal, setShowSesionModal] = useState(false);
     const [sesiones, setSesiones] = useState<OnboardingSesion[]>([]);
     const [filteredSesiones, setFilteredSesiones] = useState<OnboardingSesion[]>([]);
 
-    useEffect(() => {
-        loadData();
-    }, []);
+    // ----------------------------------------------------------------------
+    // HELPERS DE FECHAS CON DATE-FNS (Solución al desfase horario)
+    // ----------------------------------------------------------------------
 
-    // Aplicar filtro cuando cambia el filter o las sesiones
-    useEffect(() => {
-        applyFilter();
-    }, [filter, sesiones]);
+    /**
+     * Parsea una fecha string 'YYYY-MM-DD' asegurando que se interprete
+     * como hora LOCAL (00:00:00) y no como UTC.
+     * Esto corrige el error donde las fechas salían un día antes.
+     */
+    const parseLocalDate = (dateString: string): Date => {
+        if (!dateString) return new Date();
+        // 'yyyy-MM-dd' es el formato estándar que viene del backend o inputs date
+        return parse(dateString, 'yyyy-MM-dd', new Date());
+    };
 
-    const loadData = async () => {
+    /**
+     * Formatea para mostrar al usuario: "10/12/2025"
+     */
+    const formatDateForDisplay = (dateString: string): string => {
+        if (!dateString) return '';
+        const date = parseLocalDate(dateString);
+        return format(date, 'dd/MM/yyyy');
+    };
+
+    /**
+     * Formatea fecha larga: "miércoles, 10 de diciembre de 2025"
+     */
+    const formatDateLong = (dateString: string): string => {
+        if (!dateString) return '';
+        const date = parseLocalDate(dateString);
+        // PPPP da el formato largo localizado (ej: Wednesday, December 10th, 2025)
+        return format(date, 'PPPP', { locale: es });
+    };
+
+    /**
+     * Formatea para el input HTML type="date": "2025-12-10"
+     */
+    const formatDateForInput = (date: Date): string => {
+        return format(date, 'yyyy-MM-dd');
+    };
+
+    // ----------------------------------------------------------------------
+    // LÓGICA DE CARGA DE DATOS
+    // ----------------------------------------------------------------------
+
+    const loadData = useCallback(async () => {
         setLoading(true);
         setError(null);
 
         try {
+            console.log('🔄 Cargando datos del calendario...');
             const [tiposData, statsData, proximasData, sesionesData] = await Promise.all([
                 onboardingService.getTipos(),
                 onboardingService.getStats(),
@@ -67,61 +95,80 @@ const CalendarioOnboardings = () => {
             });
             setProximasSesiones(Array.isArray(proximasData) ? proximasData : []);
             setSesiones(Array.isArray(sesionesData?.data) ? sesionesData.data : []);
+            // Inicialmente las filtradas son todas
+            // Nota: El useEffect de 'filter' se encargará de refiltrar si hay un filtro activo
             setFilteredSesiones(Array.isArray(sesionesData?.data) ? sesionesData.data : []);
+
         } catch (err: any) {
             console.error('Error al cargar datos:', err);
             setError(err.message || 'Error al cargar datos');
+            // Resetear estados en caso de error para evitar UI rota
             setTipos([]);
-            setStats({
-                total: 0,
-                programadas: 0,
-                enCurso: 0,
-                completadas: 0,
-                canceladas: 0,
-            });
+            setStats({ total: 0, programadas: 0, enCurso: 0, completadas: 0, canceladas: 0 });
             setProximasSesiones([]);
             setSesiones([]);
             setFilteredSesiones([]);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
 
-    const applyFilter = () => {
+    // Carga inicial
+    useEffect(() => {
+        loadData();
+
+        // OPCIONAL: Recargar datos cuando la ventana recupera el foco
+        // (Útil si el usuario editó en otra pestaña o volvió de una navegación externa)
+        const onFocus = () => loadData();
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+    }, [loadData]);
+
+    // Aplicar filtro cuando cambia el filter o las sesiones cargadas
+    useEffect(() => {
         if (!filter) {
             setFilteredSesiones(sesiones);
-            return;
-        }
-
-        const filtered = sesiones.filter(sesion =>
-            sesion.tipo && sesion.tipo.id === filter
-        );
-        setFilteredSesiones(filtered);
-
-        // También filtrar próximas sesiones para mostrar en la sección correspondiente
-        if (filter) {
-            const proximasFiltradas = proximasSesiones.filter(sesion =>
+        } else {
+            const filtered = sesiones.filter(sesion =>
                 sesion.tipo && sesion.tipo.id === filter
             );
+            setFilteredSesiones(filtered);
+
+            // Opcional: Filtrar también las próximas sesiones si se desea consistencia visual
+            /* 
+            const proximasFiltradas = proximasSesiones.filter(sesion =>
+                 sesion.tipo && sesion.tipo.id === filter
+            );
             setProximasSesiones(proximasFiltradas);
+            */
         }
-    };
+    }, [filter, sesiones]); // proximasSesiones removido para evitar bucles si se descomenta lógica
 
     const handleFilterClick = (tipoId: string) => {
         if (filter === tipoId) {
-            setFilter(''); // Quitar filtro
-            loadData(); // Recargar datos completos
+            setFilter('');
+            // No es necesario llamar loadData() aquí porque el useEffect de arriba
+            // ya reseteará filteredSesiones a 'sesiones' (que tiene todos los datos)
         } else {
             setFilter(tipoId);
         }
     };
 
+    // ----------------------------------------------------------------------
+    // MANEJO DE EVENTOS
+    // ----------------------------------------------------------------------
+
     const handleEventClick = (evento: any) => {
-        console.log('Evento clickeado:', evento);
-        // Encontrar la sesión correspondiente
+        console.log('Evento clickeado (Calendario):', evento);
+        // Buscar por ID para asegurar tener la data más fresca del estado 'sesiones'
         const sesionEncontrada = sesiones.find(s => s.id === evento.id);
+
         if (sesionEncontrada) {
             handleSesionClick(sesionEncontrada);
+        } else {
+            // Fallback si viene directo del componente calendario con toda la data
+            console.warn('Sesión no encontrada en estado local, usando datos del evento');
+            // Aquí podrías decidir si usar 'evento.sesion' si tu componente Calendar lo devuelve
         }
     };
 
@@ -131,28 +178,34 @@ const CalendarioOnboardings = () => {
     };
 
     const handleDayClick = (date: Date) => {
+        // date viene del componente Calendar, usualmente es un objeto Date
         console.log('Día clickeado:', date);
-        // Mostrar sesiones para ese día
+
+        // Normalizamos la fecha clickeada al inicio del día para comparar correctamente
+        const clickDateStart = startOfDay(date);
+
+        // Filtrar sesiones usando date-fns isSameDay
+        // Esto es mucho más seguro que comparar milisegundos manualmente
         const sesionesDelDia = sesiones.filter(sesion => {
-            const fechaSesion = parseDateFromBackend(sesion.fechaInicio);
-            return isSameDate(fechaSesion, date);
+            const fechaSesionLocal = parseLocalDate(sesion.fechaInicio);
+            return isSameDay(fechaSesionLocal, clickDateStart);
         });
 
         if (sesionesDelDia.length > 0) {
-            // Si hay sesiones, mostrar la primera
             handleSesionClick(sesionesDelDia[0]);
         } else {
-            // Si no hay sesiones, sugerir crear una
-            const today = parseDateFromBackend(getTodayForBackend());
+            // Formatear fecha para el mensaje
+            const formattedDate = format(date, 'PPPP', { locale: es });
 
             showToast({
                 title: 'No hay sesiones programadas',
-                message: `¿Deseas crear una sesión para el ${formatDateLong(dateToInputFormat(date))}?`,
+                message: `¿Deseas crear una sesión para el ${formattedDate}?`,
                 type: 'info',
                 action: {
                     label: 'Crear sesión',
                     onClick: () => navigate('/onboarding/agendar', {
-                        state: { fechaInicio: dateToInputFormat(date) }
+                        // Enviamos la fecha en formato YYYY-MM-DD
+                        state: { fechaInicio: formatDateForInput(date) }
                     })
                 }
             });
@@ -168,8 +221,14 @@ const CalendarioOnboardings = () => {
     };
 
     const handleEditarSesion = (sesionId: string) => {
+        // Al navegar fuera, cuando el usuario regrese, esperamos que el hook de useEffect
+        // o el evento de foco recargue los datos.
         navigate(`/onboarding/editar/${sesionId}`);
     };
+
+    // ----------------------------------------------------------------------
+    // UI HELPERS
+    // ----------------------------------------------------------------------
 
     const getEstadoColor = (estado: string) => {
         switch (estado) {
@@ -196,10 +255,11 @@ const CalendarioOnboardings = () => {
         return estadosMap[estado] || estado;
     };
 
-    // Calcular estadísticas del filtro actual
     const getFilteredStats = () => {
         if (!filter) return stats;
 
+        // Recalcular estadísticas en el frontend basadas en el filtro actual
+        // (Esto evita tener que llamar al backend solo para stats filtrados)
         const filtered = sesiones.filter(s => s.tipo && s.tipo.id === filter);
         return {
             total: filtered.length,
@@ -211,6 +271,10 @@ const CalendarioOnboardings = () => {
     };
 
     const currentStats = getFilteredStats();
+
+    // ----------------------------------------------------------------------
+    // RENDER
+    // ----------------------------------------------------------------------
 
     if (loading) {
         return (
@@ -289,13 +353,13 @@ const CalendarioOnboardings = () => {
                                     <div className="space-y-2">
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Inicio:</span>
-                                            <span className="font-medium text-gray-900 dark:text-white">
+                                            <span className="font-medium text-gray-900 dark:text-white capitalize">
                                                 {formatDateLong(selectedSesion.fechaInicio)}
                                             </span>
                                         </div>
                                         <div className="flex items-center justify-between">
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Fin:</span>
-                                            <span className="font-medium text-gray-900 dark:text-white">
+                                            <span className="font-medium text-gray-900 dark:text-white capitalize">
                                                 {formatDateLong(selectedSesion.fechaFin)}
                                             </span>
                                         </div>
@@ -303,9 +367,10 @@ const CalendarioOnboardings = () => {
                                             <span className="text-sm text-gray-600 dark:text-gray-400">Duración:</span>
                                             <span className="font-medium text-gray-900 dark:text-white">
                                                 {(() => {
-                                                    const inicio = parseDateFromBackend(selectedSesion.fechaInicio);
-                                                    const fin = parseDateFromBackend(selectedSesion.fechaFin);
-                                                    const diffDays = differenceInDays(inicio, fin) + 1;
+                                                    const inicio = parseLocalDate(selectedSesion.fechaInicio);
+                                                    const fin = parseLocalDate(selectedSesion.fechaFin);
+                                                    // differenceInDays devuelve entero absoluto
+                                                    const diffDays = Math.abs(differenceInDays(fin, inicio)) + 1;
                                                     return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
                                                 })()}
                                             </span>
@@ -430,7 +495,7 @@ const CalendarioOnboardings = () => {
                                 variant="primary"
                                 onClick={() => {
                                     setShowSesionModal(false);
-                                    navigate(`/onboarding/editar/${selectedSesion.id}`);
+                                    handleEditarSesion(selectedSesion.id);
                                 }}
                             >
                                 <span className="material-symbols-outlined">edit</span>
