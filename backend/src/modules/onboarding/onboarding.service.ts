@@ -19,6 +19,7 @@ import {
     PaginatedSesionesResponse,
     SesionStats,
 } from './interfaces/sesion-response.interface';
+import { parse } from 'date-fns'; // <-- CAMBIO: Importar la función parse de date-fns
 
 @Injectable()
 export class OnboardingService {
@@ -32,8 +33,17 @@ export class OnboardingService {
     ) { }
 
     async create(createDto: CreateSesionDto, user: User): Promise<OnboardingSesion> {
-        // Validar fechas
-        if (createDto.fechaFin && createDto.fechaInicio > createDto.fechaFin) {
+        // <-- CAMBIO: Validar que fechaFin exista
+        if (!createDto.fechaFin) {
+            throw new BadRequestException('La fecha de fin es requerida');
+        }
+
+        // <-- CAMBIO: Parsear las fechas de string a Date (hora local)
+        const fechaInicioDate = parse(createDto.fechaInicio, 'yyyy-MM-dd', new Date());
+        const fechaFinDate = parse(createDto.fechaFin, 'yyyy-MM-dd', new Date());
+
+        // Validar fechas usando los objetos Date ya parseados
+        if (fechaFinDate && fechaInicioDate > fechaFinDate) {
             throw new BadRequestException('La fecha de inicio debe ser anterior a la fecha de fin');
         }
 
@@ -73,6 +83,9 @@ export class OnboardingService {
         // Crear sesión
         const sesion = this.sesionesRepository.create({
             ...createDto,
+            // <-- CAMBIO: Usar los objetos Date parseados
+            fechaInicio: fechaInicioDate,
+            fechaFin: fechaFinDate,
             tipo,
             participantes,
             creadoPor: user,
@@ -107,13 +120,24 @@ export class OnboardingService {
         if (estado) where.estado = estado;
         if (activo !== undefined) where.activo = activo;
 
-        // Filtro por rango de fechas
-        if (fechaDesde && fechaHasta) {
-            where.fechaInicio = Between(fechaDesde, fechaHasta);
-        } else if (fechaDesde) {
-            where.fechaInicio = Between(fechaDesde, new Date());
-        } else if (fechaHasta) {
-            where.fechaInicio = Between(new Date('2000-01-01'), fechaHasta);
+        // <-- CAMBIO: Parsear las fechas del filtro si existen
+        let fechaDesdeDate: Date | undefined;
+        let fechaHastaDate: Date | undefined;
+
+        if (fechaDesde) {
+            fechaDesdeDate = parse(fechaDesde, 'yyyy-MM-dd', new Date());
+        }
+        if (fechaHasta) {
+            fechaHastaDate = parse(fechaHasta, 'yyyy-MM-dd', new Date());
+        }
+
+        // Filtro por rango de fechas usando los objetos Date parseados
+        if (fechaDesdeDate && fechaHastaDate) {
+            where.fechaInicio = Between(fechaDesdeDate, fechaHastaDate);
+        } else if (fechaDesdeDate) {
+            where.fechaInicio = Between(fechaDesdeDate, new Date());
+        } else if (fechaHastaDate) {
+            where.fechaInicio = Between(new Date('2000-01-01'), fechaHastaDate);
         }
 
         // Calcular skip para paginación
@@ -180,12 +204,32 @@ export class OnboardingService {
             throw new NotFoundException(`Sesión con ID ${id} no encontrada`);
         }
 
-        // Validar fechas si se actualizan
-        if (updateDto.fechaInicio && updateDto.fechaFin) {
-            if (updateDto.fechaInicio > updateDto.fechaFin) {
+        // <-- CAMBIO: Crear un objeto de actualización separado y con tipos correctos
+        const datosParaActualizar: Partial<OnboardingSesion> = {};
+
+        // Parsear y añadir fechas si se proporcionan
+        if (updateDto.fechaInicio) {
+            datosParaActualizar.fechaInicio = parse(updateDto.fechaInicio, 'yyyy-MM-dd', new Date());
+        }
+        if (updateDto.fechaFin) {
+            datosParaActualizar.fechaFin = parse(updateDto.fechaFin, 'yyyy-MM-dd', new Date());
+        }
+
+        // Validar fechas si ambas se actualizan
+        if (datosParaActualizar.fechaInicio && datosParaActualizar.fechaFin) {
+            if (datosParaActualizar.fechaInicio > datosParaActualizar.fechaFin) {
                 throw new BadRequestException('La fecha de inicio debe ser anterior a la fecha de fin');
             }
         }
+
+        // Añadir otros campos simples
+        if (updateDto.titulo) datosParaActualizar.titulo = updateDto.titulo;
+        if (updateDto.descripcion !== undefined) datosParaActualizar.descripcion = updateDto.descripcion;
+        if (updateDto.estado) datosParaActualizar.estado = updateDto.estado;
+        if (updateDto.capacidadMaxima) datosParaActualizar.capacidadMaxima = updateDto.capacidadMaxima;
+        if (updateDto.ubicacion !== undefined) datosParaActualizar.ubicacion = updateDto.ubicacion;
+        if (updateDto.enlaceVirtual !== undefined) datosParaActualizar.enlaceVirtual = updateDto.enlaceVirtual;
+        if (updateDto.notas !== undefined) datosParaActualizar.notas = updateDto.notas;
 
         // Actualizar tipo si se especifica
         if (updateDto.tipoId) {
@@ -196,9 +240,7 @@ export class OnboardingService {
             if (!tipo) {
                 throw new NotFoundException('Tipo de onboarding no encontrado');
             }
-
             sesion.tipo = tipo;
-            delete updateDto.tipoId;
         }
 
         // Actualizar participantes si se especifican
@@ -220,11 +262,10 @@ export class OnboardingService {
             }
 
             sesion.participantes = participantes;
-            delete updateDto.participantesIds;
         }
 
-        // Actualizar sesión
-        Object.assign(sesion, updateDto);
+        // Actualizar sesión con el payload modificado
+        Object.assign(sesion, datosParaActualizar);
         sesion.actualizadoPor = user;
 
         return await this.sesionesRepository.save(sesion);
@@ -399,6 +440,7 @@ export class OnboardingService {
     }
 
     async getSesionesPorMes(año: number, mes: number): Promise<OnboardingSesion[]> {
+        // Estos métodos crean fechas desde números, no desde strings, por lo que no necesitan parseo.
         const fechaInicio = new Date(año, mes - 1, 1);
         const fechaFin = new Date(año, mes, 0); // Último día del mes
 

@@ -1,16 +1,13 @@
 import {
     IsString,
-    IsDate,
     IsEnum,
     IsOptional,
-    IsBoolean,
     IsUUID,
     IsInt,
     Min,
     Max,
     IsArray,
 } from 'class-validator';
-import { Type } from 'class-transformer';
 import { ApiProperty } from '@nestjs/swagger';
 import { EstadoSesion } from '../entities/onboarding-sesion.entity';
 
@@ -36,19 +33,17 @@ export class CreateSesionDto {
     tipoId: string;
 
     @ApiProperty({ description: 'Fecha de inicio', example: '2024-07-16' })
-    @IsDate()
-    @Type(() => Date)
-    fechaInicio: Date;
+    @IsString()
+    fechaInicio: string;
 
     @ApiProperty({
         description: 'Fecha de fin',
         example: '2024-07-18',
         required: false,
     })
-    @IsDate()
-    @Type(() => Date)
+    @IsString()
     @IsOptional()
-    fechaFin?: Date;
+    fechaFin?: string;
 
     @ApiProperty({
         description: 'Estado de la sesión',

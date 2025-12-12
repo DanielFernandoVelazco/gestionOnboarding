@@ -28,9 +28,9 @@ export class FilterSesionDto {
         required: false,
     })
     @IsDate()
-    @Type(() => Date)
+    @Type(() => String)
     @IsOptional()
-    fechaDesde?: Date;
+    fechaDesde?: string;
 
     @ApiProperty({
         description: 'Filtrar por fecha hasta',
@@ -38,9 +38,9 @@ export class FilterSesionDto {
         required: false,
     })
     @IsDate()
-    @Type(() => Date)
+    @Type(() => String)
     @IsOptional()
-    fechaHasta?: Date;
+    fechaHasta?: string;
 
     @ApiProperty({
         description: 'Filtrar por sesiones activas',
