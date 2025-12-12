@@ -1,8 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+// IMPORTANTE: Asegúrate de tener instalada la librería: npm install date-fns
+import { format, addDays, parseISO, isValid, isBefore, startOfToday } from 'date-fns';
+
 import { onboardingService } from '../../../services/onboarding.service';
 import { colaboradoresService } from '../../../services/colaboradores.service';
 import Card from '../../../components/ui/Card';
@@ -11,17 +14,6 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 import Modal from '../../../components/ui/Modal';
 import { useToast } from '../../../contexts/ToastContext';
-import {
-    formatDateForInput,
-    formatDateForBackend,
-    isValidDate,
-    parseDateFromBackend,
-    dateToBackendFormat,
-    addDays,
-    differenceInDaysString,
-    formatDateForDisplay,
-    getTodayForBackend
-} from '../../../utils/dateUtils';
 
 // NO usar tipos estáticos - obtener desde API
 const estados = [
@@ -31,13 +23,14 @@ const estados = [
     { value: 'cancelada', label: 'Cancelada' },
 ];
 
-// Esquema de validación mejorado
+// Esquema de validación mejorado con date-fns
 const schema = z.object({
     titulo: z.string().min(3, 'El título debe tener al menos 3 caracteres'),
     descripcion: z.string().optional(),
     tipoId: z.string().uuid('Debe seleccionar un tipo de onboarding válido'),
-    fechaInicio: z.string().min(1).refine(isValidDate, { message: 'Fecha inválida' }),
-    fechaFin: z.string().min(1).refine(isValidDate, { message: 'Fecha inválida' }),
+    // Validamos que sea un string y que sea una fecha válida parseable
+    fechaInicio: z.string().min(1, 'La fecha de inicio es requerida').refine((val) => isValid(parseISO(val)), { message: 'Fecha inválida' }),
+    fechaFin: z.string().min(1, 'La fecha de fin es requerida').refine((val) => isValid(parseISO(val)), { message: 'Fecha inválida' }),
     estado: z.enum(['programada', 'en_curso', 'completada', 'cancelada']),
     capacidadMaxima: z.number()
         .min(1, 'La capacidad mínima es 1')
@@ -48,16 +41,14 @@ const schema = z.object({
     participantesIds: z.array(z.string()).optional(),
 }).refine(
     (data) => {
-        // Usar parseDateFromBackend para evitar problemas de timezone
-        const inicio = parseDateFromBackend(data.fechaInicio);
-        const fin = parseDateFromBackend(data.fechaFin);
-        return inicio <= fin;
+        // Comparamos los strings directamente. YYYY-MM-DD se puede comparar alfabéticamente.
+        return data.fechaInicio <= data.fechaFin;
     },
     {
         message: 'La fecha de fin debe ser posterior o igual a la fecha de inicio',
         path: ['fechaFin'],
     }
-);
+)
 
 type FormData = z.infer<typeof schema>;
 
@@ -71,22 +62,24 @@ const AgendarOnboarding = () => {
     const [showParticipantsModal, setShowParticipantsModal] = useState(false);
     const [searchParticipant, setSearchParticipant] = useState('');
 
+    // Inicialización de fechas usando date-fns para evitar errores de zona horaria
+    const today = startOfToday();
+    const tomorrow = addDays(today, 1);
+
     const {
         register,
         handleSubmit,
         formState: { errors },
         watch,
         setValue,
-        reset,
     } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
             estado: 'programada',
             capacidadMaxima: 1,
-            // Establecer fecha de inicio como hoy (en formato YYYY-MM-DD)
-            fechaInicio: getTodayForBackend(),
-            // Establecer fecha de fin como mañana (en formato YYYY-MM-DD)
-            fechaFin: dateToBackendFormat(addDays(parseDateFromBackend(getTodayForBackend()), 1))
+            // Format devuelve 'YYYY-MM-DD' basado en la hora local del sistema
+            fechaInicio: format(today, 'yyyy-MM-dd'),
+            fechaFin: format(tomorrow, 'yyyy-MM-dd')
         },
     });
 
@@ -121,21 +114,21 @@ const AgendarOnboarding = () => {
         setLoading(true);
 
         try {
-            // Validar que tipoId exista en los tipos disponibles
             const tipoSeleccionado = tipos.find(t => t.id === data.tipoId);
             if (!tipoSeleccionado) {
                 throw new Error('Tipo de onboarding seleccionado no es válido');
             }
 
+            // PASO CLAVE: Forzamos las fechas a ser strings YYYY-MM-DD.
+            // Esto protege contra cualquier conversión a Date o ISO string que haya ocurrido.
             const formData = {
                 ...data,
-                // Usar formatDateForBackend para asegurar el formato correcto
-                fechaInicio: formatDateForBackend(data.fechaInicio),
-                fechaFin: formatDateForBackend(data.fechaFin),
+                fechaInicio: data.fechaInicio.split('T')[0], // "2025-12-10T05:00:00.000Z" -> "2025-12-10"
+                fechaFin: data.fechaFin.split('T')[0],       // Previene cualquier problema
                 participantesIds: selectedParticipants.length > 0 ? selectedParticipants : undefined,
             };
 
-            console.log('Enviando datos:', formData); // Para depuración
+            console.log('Enviando datos al backend (CORREGIDO):', formData);
 
             await onboardingService.createSesion(formData);
             showToast({
@@ -179,21 +172,20 @@ const AgendarOnboarding = () => {
         colaborador.email.toLowerCase().includes(searchParticipant.toLowerCase())
     );
 
-    // Opciones para el select de tipos - usando UUIDs reales
     const tipoOptions = [
         { value: '', label: 'Seleccionar tipo de onboarding' },
         ...tipos.map(tipo => ({
-            value: tipo.id,  // UUID real
+            value: tipo.id,
             label: tipo.nombre,
             color: tipo.color,
         }))
     ];
 
-    // Tipo seleccionado para mostrar información
     const tipoSeleccionado = tipos.find(t => t.id === tipoId);
 
-    // Calcular min date para fechaFin basado en fechaInicio
-    const minDateForFin = fechaInicio;
+    // Calcular min date para fechaFin basado en fechaInicio para el input HTML
+    // Si fechaInicio existe, ese es el mínimo. Si no, usamos hoy.
+    const minDateForFin = fechaInicio || format(new Date(), 'yyyy-MM-dd');
 
     return (
         <div className="space-y-6">
@@ -365,15 +357,10 @@ const AgendarOnboarding = () => {
                         <Input
                             label="Fecha de inicio"
                             type="date"
+                            // El input type date espera y retorna 'YYYY-MM-DD' nativamente
                             {...register('fechaInicio')}
                             error={errors.fechaInicio?.message}
                             required
-                            // Asegurar formato correcto para input type="date"
-                            value={fechaInicio ? formatDateForInput(fechaInicio) : ''}
-                            onChange={(e) => {
-                                const formattedDate = formatDateForBackend(e.target.value);
-                                setValue('fechaInicio', formattedDate, { shouldValidate: true });
-                            }}
                         />
 
                         <Input
@@ -383,12 +370,6 @@ const AgendarOnboarding = () => {
                             error={errors.fechaFin?.message}
                             min={minDateForFin}
                             required
-                            // Asegurar formato correcto para input type="date"
-                            value={watch('fechaFin') ? formatDateForInput(watch('fechaFin')) : ''}
-                            onChange={(e) => {
-                                const formattedDate = formatDateForBackend(e.target.value);
-                                setValue('fechaFin', formattedDate, { shouldValidate: true });
-                            }}
                         />
 
                         <Input
