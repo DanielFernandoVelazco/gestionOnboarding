@@ -5,7 +5,7 @@ import {
     BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Between, In } from 'typeorm';
+import { Repository, FindOptionsWhere, Between, In, MoreThanOrEqual } from 'typeorm';
 import { OnboardingSesion, EstadoSesion } from './entities/onboarding-sesion.entity';
 import { OnboardingTipo } from './entities/onboarding-tipo.entity';
 import { CreateSesionDto } from './dto/create-sesion.dto';
@@ -458,15 +458,19 @@ export class OnboardingService {
         const hoy = new Date();
         hoy.setHours(0, 0, 0, 0);
 
-        return await this.sesionesRepository.find({
-            where: {
-                fechaInicio: Between(hoy, new Date(hoy.getTime() + 30 * 24 * 60 * 60 * 1000)), // Próximos 30 días
-                activo: true,
-                estado: EstadoSesion.PROGRAMADA,
-            },
+        const whereClause = {
+            fechaInicio: MoreThanOrEqual(hoy),
+            activo: true,
+            estado: EstadoSesion.PROGRAMADA,
+        };
+
+        const sesiones = await this.sesionesRepository.find({
+            where: whereClause,
             relations: ['tipo'],
             order: { fechaInicio: 'ASC' },
             take: limite,
         });
+
+        return sesiones;
     }
 }
