@@ -10,15 +10,25 @@ import Input from '../../../components/ui/Input';
 import Select from '../../../components/ui/Select';
 
 const schema = z.object({
-    titulo: z.string().min(3, 'El título debe tener al menos 3 caracteres'),
+    titulo: z.string().min(3),
+    tipoId: z.string().min(1),
+    fechaInicio: z.string(),
+    fechaFin: z.string(),
+
+    estado: z.enum([
+        'programada',
+        'en_curso',
+        'completada',
+        'cancelada',
+    ]),
+
+    capacidadMaxima: z
+        .number()
+        .min(1, 'La capacidad debe ser al menos 1'),
+
     descripcion: z.string().optional(),
-    tipoId: z.string().min(1, 'Selecciona un tipo de onboarding'),
-    fechaInicio: z.string().min(1, 'La fecha de inicio es requerida'),
-    fechaFin: z.string().min(1, 'La fecha de fin es requerida'),
-    estado: z.enum(['programada', 'en_curso', 'completada', 'cancelada']).default('programada'),
-    capacidadMaxima: z.coerce.number().min(1, 'La capacidad debe ser al menos 1').default(10),
     ubicacion: z.string().optional(),
-    enlaceVirtual: z.string().url('URL inválida').optional().or(z.literal('')),
+    enlaceVirtual: z.string().url().optional().or(z.literal('')),
     notas: z.string().optional(),
 });
 
