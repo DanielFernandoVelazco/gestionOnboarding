@@ -3,9 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-// IMPORTANTE: Asegúrate de tener instalada la librería: npm install date-fns
-import { format, addDays, parseISO, isValid, isBefore, startOfToday } from 'date-fns';
-
+import { format, addDays, parseISO, isValid, startOfToday } from 'date-fns';
 import { onboardingService } from '../../../services/onboarding.service';
 import { colaboradoresService } from '../../../services/colaboradores.service';
 import Card from '../../../components/ui/Card';
@@ -71,7 +69,6 @@ const AgendarOnboarding = () => {
         handleSubmit,
         formState: { errors },
         watch,
-        setValue,
     } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
