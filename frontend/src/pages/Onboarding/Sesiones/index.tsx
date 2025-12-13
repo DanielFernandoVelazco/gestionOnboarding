@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { onboardingService, OnboardingSesion } from '../../../services/onboarding.service';
 import Card from '../../../components/ui/Card';
@@ -87,7 +87,7 @@ const SesionesOnboarding = () => {
             render: (sesion: OnboardingSesion) => (
                 <div>
                     <div className="text-gray-900 dark:text-white">
-                        {sesion.participantes.length} / {sesion.capacidadMaxima}
+                        {sesion.participantes?.length ?? 0} / {sesion.capacidadMaxima}
                     </div>
                     <div className="text-gray-500 dark:text-gray-400 text-sm">
                         {sesion.ubicacion || 'Virtual'}
@@ -164,7 +164,11 @@ const SesionesOnboarding = () => {
             setSesiones(response.data || []);
         } catch (error) {
             console.error('Error al cargar sesiones:', error);
-            showToast('Error al cargar sesiones', 'error');
+            showToast({
+                title: 'Error al cargar sesiones',
+                message: 'No se pudieron cargar los tipos de sesiones',
+                type: 'error'
+            });
             setSesiones([]);
         } finally {
             setLoading(false);
@@ -178,11 +182,19 @@ const SesionesOnboarding = () => {
 
         try {
             await onboardingService.deleteSesion(sesionId);
-            showToast('Sesión eliminada exitosamente', 'success');
+            showToast({
+                title: 'Éxito',
+                message: 'Sesión de onboarding creada exitosamente',
+                type: 'success'
+            });
             loadSesiones();
         } catch (error: any) {
             console.error('Error al eliminar sesión:', error);
-            showToast(error.response?.data?.message || 'Error al eliminar sesión', 'error');
+            showToast({
+                title: 'Error',
+                message: error.message || error.response?.data?.message || 'Error al eliminar sesión',
+                type: 'error'
+            });
         }
     };
 
