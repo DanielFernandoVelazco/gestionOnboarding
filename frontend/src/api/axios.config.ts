@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+// IMPORTANTE: Cambiar el puerto a 3001 según la información del contexto
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 const api = axios.create({
