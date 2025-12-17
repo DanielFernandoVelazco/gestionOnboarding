@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -231,9 +231,121 @@ const AlertasCorreo = () => {
                 </div>
             )}
 
-            {/* Calendario de Sesiones - Se mantiene igual */}
+            {/* Calendario de Sesiones */}
             <Card title="Calendario de Sesiones">
-                {/* ... (código del calendario se mantiene igual) */}
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleAnteriorMes}
+                        >
+                            <span className="material-symbols-outlined">chevron_left</span>
+                        </Button>
+                        <span className="text-gray-700 dark:text-gray-200 text-sm font-medium">
+                            {meses[mesActual - 1]} - {meses[(mesActual + 1) % 12]} {añoActual}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleSiguienteMes}
+                        >
+                            <span className="material-symbols-outlined">chevron_right</span>
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Julio */}
+                    <div className="flex flex-col gap-4">
+                        <h3 className="text-center font-semibold text-gray-800 dark:text-gray-200 text-base">
+                            Julio 2024
+                        </h3>
+                        <div className="grid grid-cols-7 text-center text-xs text-gray-500 dark:text-gray-400">
+                            {['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((dia, i) => (
+                                <span key={i}>{dia}</span>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 text-center text-sm">
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+                                <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
+                                    {dia === 16 ? (
+                                        <>
+                                            <span className="absolute -top-1 -left-1 flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white">
+                                                {dia}
+                                            </span>
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary rounded-full"></div>
+                                        </>
+                                    ) : (
+                                        <span className={`p-1 ${dia === new Date().getDate() && mesActual === new Date().getMonth() + 1 ? 'text-primary font-bold' : ''}`}>
+                                            {dia}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Agosto */}
+                    <div className="flex flex-col gap-4">
+                        <h3 className="text-center font-semibold text-gray-800 dark:text-gray-200 text-base">
+                            Agosto 2024
+                        </h3>
+                        <div className="grid grid-cols-7 text-center text-xs text-gray-500 dark:text-gray-400">
+                            {['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((dia, i) => (
+                                <span key={i}>{dia}</span>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 text-center text-sm">
+                            {Array.from({ length: 31 }, (_, i) => i + 1).map((dia) => (
+                                <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
+                                    {dia === 13 ? (
+                                        <>
+                                            <span className="absolute -top-1 -left-1 flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40">
+                                                {dia}
+                                            </span>
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary/40 rounded-full"></div>
+                                        </>
+                                    ) : (
+                                        <span className={`p-1 ${dia <= 3 ? 'text-gray-400 dark:text-gray-600' : ''}`}>
+                                            {dia}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Septiembre */}
+                    <div className="flex flex-col gap-4">
+                        <h3 className="text-center font-semibold text-gray-800 dark:text-gray-200 text-base">
+                            Septiembre 2024
+                        </h3>
+                        <div className="grid grid-cols-7 text-center text-xs text-gray-500 dark:text-gray-400">
+                            {['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((dia, i) => (
+                                <span key={i}>{dia}</span>
+                            ))}
+                        </div>
+                        <div className="grid grid-cols-7 text-center text-sm">
+                            {Array.from({ length: 30 }, (_, i) => i + 1).map((dia) => (
+                                <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
+                                    {dia === 10 ? (
+                                        <>
+                                            <span className="absolute -top-1 -left-1 flex items-center justify-center w-8 h-8 rounded-full bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40">
+                                                {dia}
+                                            </span>
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 w-2 h-2 bg-primary/40 rounded-full"></div>
+                                        </>
+                                    ) : (
+                                        <span className={`p-1 ${dia <= 6 ? 'text-gray-400 dark:text-gray-600' : ''}`}>
+                                            {dia}
+                                        </span>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
             </Card>
 
             {/* Participantes y Detalles */}
@@ -477,12 +589,50 @@ const AlertasCorreo = () => {
                 </div>
             </div>
 
-            {/* Probar Notificaciones - Se mantiene igual */}
+            {/* Probar Notificaciones */}
             <Card
                 title="Probar Notificaciones"
                 subtitle="Verifica la entrega de alertas por correo."
+                actions={
+                    <Button variant="outline" onClick={enviarCorreoPrueba}>
+                        <span className="material-symbols-outlined">send</span>
+                        Enviar Correo de Prueba
+                    </Button>
+                }
             >
-                {/* ... (código de pruebas se mantiene igual) */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                            Notificar Participantes
+                        </h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
+                            Envía notificaciones a todos los participantes de la sesión.
+                        </p>
+                        <Button variant="primary" onClick={notificarParticipantes}>
+                            <span className="material-symbols-outlined">notifications</span>
+                            Notificar Todos
+                        </Button>
+                    </div>
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <h4 className="font-medium text-green-800 dark:text-green-300 mb-2">
+                            Estadísticas de Envío
+                        </h4>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">24</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">Total Notificaciones</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">18</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">Enviadas</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">4</p>
+                                <p className="text-sm text-yellow-600 dark:text-yellow-500">Pendientes</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </Card>
         </div>
     );
