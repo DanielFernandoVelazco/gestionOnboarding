@@ -17,6 +17,10 @@ const AlertasCorreo = () => {
     const [loadingNotificaciones, setLoadingNotificaciones] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
+    // NUEVOS ESTADOS
+    const [loadingTodosParticipantes, setLoadingTodosParticipantes] = useState(false);
+    const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
+
     // Nombres de meses en español
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -24,54 +28,119 @@ const AlertasCorreo = () => {
     ];
 
     useEffect(() => {
-        cargarDatos();
+        cargarCalendario(); // Modificado: antes era cargarDatos()
     }, [mesActual, añoActual]);
 
     useEffect(() => {
         cargarNotificaciones();
     }, []);
 
-    const cargarDatos = async () => {
+    // REEMPLAZADO: función cargarDatos por cargarCalendario
+    const cargarCalendario = async () => {
         setLoading(true);
         setError(null);
+        // Limpiamos los estados relacionados con participantes al cambiar de mes
+        setParticipantes([]);
+        setParticipanteSeleccionado(null);
+        setDiaSeleccionado(null);
 
         try {
-            // Cargar calendario del mes
             const calendarioData = await notificacionesService.getCalendarioMes(añoActual, mesActual);
             setCalendario(calendarioData);
-
-            // Buscar sesiones en el mes actual para cargar participantes
-            if (calendarioData.semanas.length > 0) {
-                // Buscar la primera sesión del mes
-                const primeraSesion = calendarioData.semanas.flatMap(semana =>
-                    semana.flatMap(dia => dia.sesiones)
-                )[0];
-
-                if (primeraSesion) {
-                    setSesionSeleccionada(primeraSesion.id);
-                    const participantesData = await notificacionesService.getParticipantesSesion(primeraSesion.id);
-                    setParticipantes(participantesData);
-                    if (participantesData.length > 0) {
-                        setParticipanteSeleccionado(participantesData[0]);
-                    }
-                } else {
-                    // Si no hay sesiones, intentar cargar participantes de una sesión predeterminada
-                    try {
-                        const participantesData = await notificacionesService.getParticipantesSesion('sesion-1');
-                        setParticipantes(participantesData);
-                        if (participantesData.length > 0) {
-                            setParticipanteSeleccionado(participantesData[0]);
-                        }
-                    } catch (error) {
-                        console.error('No se pudo cargar participantes de sesión predeterminada:', error);
-                    }
-                }
-            }
         } catch (error: any) {
-            setError(error.message || 'Error al cargar los datos');
-            console.error('Error al cargar datos:', error);
+            setError(error.message || 'Error al cargar el calendario');
+            console.error('Error al cargar calendario:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // NUEVA FUNCIÓN: cargar participantes de una sesión específica
+    const cargarParticipantesPorSesion = async (sesionId: string) => {
+        try {
+            const participantesData = await notificacionesService.getParticipantesSesion(sesionId);
+            setParticipantes(participantesData);
+            setSesionSeleccionada(sesionId);
+            if (participantesData.length > 0) {
+                setParticipanteSeleccionado(participantesData[0]);
+            } else {
+                setParticipanteSeleccionado(null);
+            }
+        } catch (error: any) {
+            console.error('Error al cargar participantes de la sesión:', error);
+            setParticipantes([]);
+            setParticipanteSeleccionado(null);
+        }
+    };
+
+    // NUEVO MANEJADOR: al hacer clic en un día del calendario
+    const handleDiaClick = (dia: number) => {
+        if (!calendario) return;
+
+        const sesionesDelDia: string[] = [];
+        calendario.semanas.forEach(semana => {
+            semana.forEach(diaCalendario => {
+                if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
+                    diaCalendario.sesiones.forEach(sesion => {
+                        sesionesDelDia.push(sesion.id);
+                    });
+                }
+            });
+        });
+
+        if (sesionesDelDia.length > 0) {
+            setDiaSeleccionado(dia);
+            cargarParticipantesPorSesion(sesionesDelDia[0]);
+        }
+    };
+
+    // NUEVA FUNCIÓN: mostrar todos los participantes del mes
+    const handleMostrarTodosParticipantesMes = async () => {
+        if (!calendario) {
+            alert('El calendario no está cargado.');
+            return;
+        }
+
+        setLoadingTodosParticipantes(true);
+        setParticipantes([]);
+        setParticipanteSeleccionado(null);
+        setDiaSeleccionado(null);
+
+        try {
+            const sesionesIds = new Set<string>();
+            calendario.semanas.forEach(semana => {
+                semana.forEach(dia => {
+                    dia.sesiones.forEach(sesion => {
+                        sesionesIds.add(sesion.id);
+                    });
+                });
+            });
+
+            if (sesionesIds.size === 0) {
+                alert('No hay sesiones este mes.');
+                return;
+            }
+
+            const promesasParticipantes = Array.from(sesionesIds).map(id =>
+                notificacionesService.getParticipantesSesion(id)
+            );
+
+            const resultados = await Promise.all(promesasParticipantes);
+            const todosParticipantes = resultados.flat();
+            const participantesUnicos = todosParticipantes.filter((participante, index, self) =>
+                index === self.findIndex((p) => p.id === participante.id)
+            );
+
+            setParticipantes(participantesUnicos);
+            if (participantesUnicos.length > 0) {
+                setParticipanteSeleccionado(participantesUnicos[0]);
+            }
+
+        } catch (error: any) {
+            console.error('Error al cargar todos los participantes del mes:', error);
+            alert('No se pudieron cargar los participantes del mes.');
+        } finally {
+            setLoadingTodosParticipantes(false);
         }
     };
 
@@ -220,7 +289,7 @@ const AlertasCorreo = () => {
                         <div key={`empty-${i}`} className="p-1"></div>
                     ))}
 
-                    {/* Días del mes */}
+                    {/* Días del mes - MODIFICADO */}
                     {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((dia) => {
                         const esDestacado = esMesActual && diasDestacados.includes(dia);
                         const hoy = new Date();
@@ -229,71 +298,34 @@ const AlertasCorreo = () => {
                             mesAjustado === hoy.getMonth() + 1 &&
                             añoAjustado === hoy.getFullYear();
 
-                        // Verificar si hay eventos o sesiones en este día
-                        let tieneEventos = false;
                         let tieneSesiones = false;
-                        let tiposEnDia: { type: string; color: string }[] = [];
-
                         if (calendario && esMesActual) {
                             calendario.semanas.forEach(semana => {
                                 semana.forEach(diaCalendario => {
                                     if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
-                                        tieneEventos = diaCalendario.eventos.length > 0;
                                         tieneSesiones = diaCalendario.sesiones.length > 0;
-
-                                        // Collect all types for this day
-                                        diaCalendario.sesiones.forEach(sesion => {
-                                            tiposEnDia.push(getSessionTypeAndColor(sesion));
-                                        });
-
-                                        diaCalendario.eventos.forEach(evento => {
-                                            tiposEnDia.push(getEventTypeAndColor(evento));
-                                        });
                                     }
                                 });
                             });
                         }
 
-                        // Get unique types for this day
-                        const tiposUnicos = tiposEnDia.filter((tipo, index, self) =>
-                            index === self.findIndex((t) => t.type === tipo.type)
-                        );
+                        const esDiaSeleccionado = esMesActual && dia === diaSeleccionado;
 
                         return (
                             <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
-                                {(esDestacado || tieneEventos || tieneSesiones) ? (
-                                    <>
-                                        <span className={`absolute -top-1 -left-1 flex items-center justify-center w-8 h-8 rounded-full ${esHoy
-                                            ? 'bg-primary text-white'
-                                            : tiposUnicos.length > 0
-                                                ? ''
-                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40'
+                                {tieneSesiones ? (
+                                    <button
+                                        onClick={() => handleDiaClick(dia)}
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${esDiaSeleccionado
+                                                ? 'bg-primary text-white ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-800'
+                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40 hover:bg-primary/30'
                                             }`}
-                                            style={{
-                                                backgroundColor: tiposUnicos.length > 0 ? tiposUnicos[0].color : undefined
-                                            }}
-                                        >
-                                            {dia}
-                                        </span>
-                                        {tiposUnicos.length > 0 && (
-                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex gap-1">
-                                                {tiposUnicos.slice(0, 3).map((tipo, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="w-1.5 h-1.5 rounded-full"
-                                                        style={{ backgroundColor: tipo.color }}
-                                                    ></div>
-                                                ))}
-                                            </div>
-                                        )}
-                                    </>
+                                        title={`Ver sesiones del día ${dia}`}
+                                    >
+                                        {dia}
+                                    </button>
                                 ) : (
-                                    <span className={`p-1 ${esHoy
-                                        ? 'text-primary font-bold'
-                                        : (mesOffset !== 0 && (dia <= 3 || (mesOffset === -1 && dia > 28)))
-                                            ? 'text-gray-400 dark:text-gray-600'
-                                            : ''
-                                        }`}>
+                                    <span className={`p-1 ${esHoy ? 'text-primary font-bold' : ''}`}>
                                         {dia}
                                     </span>
                                 )}
@@ -339,50 +371,6 @@ const AlertasCorreo = () => {
                 alert(`Error al eliminar participante: ${err.message}`);
                 console.error('Error al eliminar participante:', err);
             }
-        }
-    };
-
-    const agregarParticipante = async () => {
-        try {
-            // Obtener colaboradores disponibles
-            const colaboradoresDisponibles = await notificacionesService.getColaboradoresDisponibles();
-
-            // Filtrar colaboradores que ya están en la sesión
-            const participantesIds = participantes.map(p => p.id);
-            const disponibles = colaboradoresDisponibles.filter(
-                (c: any) => !participantesIds.includes(c.id)
-            );
-
-            if (disponibles.length === 0) {
-                alert('No hay colaboradores disponibles para agregar');
-                return;
-            }
-
-            // Mostrar diálogo simple para seleccionar colaborador
-            const colaboradorSeleccionado = disponibles[0]; // Por ahora seleccionamos el primero
-
-            // Agregar a la sesión
-            await notificacionesService.agregarParticipanteSesion(sesionSeleccionada || 'sesion-1', colaboradorSeleccionado.id);
-
-            // Actualizar la lista
-            const nuevoParticipante: ParticipanteSesion = {
-                id: colaboradorSeleccionado.id,
-                nombreCompleto: colaboradorSeleccionado.nombreCompleto,
-                email: colaboradorSeleccionado.email,
-                telefono: colaboradorSeleccionado.telefono,
-                departamento: colaboradorSeleccionado.departamento,
-                puesto: colaboradorSeleccionado.puesto,
-                fechaIngreso: colaboradorSeleccionado.fechaIngreso,
-                fechaOnboardingTecnico: colaboradorSeleccionado.fechaOnboardingTecnico,
-                lugarAsignacion: colaboradorSeleccionado.lugarAsignacion,
-            };
-
-            setParticipantes([...participantes, nuevoParticipante]);
-            alert(`${colaboradorSeleccionado.nombreCompleto} agregado a la sesión`);
-
-        } catch (err: any) {
-            alert(`Error al agregar participante: ${err.message}`);
-            console.error('Error al agregar participante:', err);
         }
     };
 
@@ -458,6 +446,14 @@ const AlertasCorreo = () => {
     const estadisticas = calcularEstadisticas();
     const tiposEnCalendario = getTiposEnCalendario();
 
+    // Título dinámico para la tarjeta de participantes
+    let tituloParticipantes = `Participantes de sesiones - ${meses[mesActual - 1]} ${añoActual}`;
+    if (diaSeleccionado) {
+        tituloParticipantes = `Participantes del ${diaSeleccionado} de ${meses[mesActual - 1]} - ${participantes.length} encontrados`;
+    } else if (participantes.length > 0 && !diaSeleccionado) {
+        tituloParticipantes = `Todos los participantes del mes - ${participantes.length} encontrados`;
+    }
+
     return (
         <div className="space-y-8">
             {/* Header */}
@@ -474,7 +470,7 @@ const AlertasCorreo = () => {
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                     <p className="text-red-600 dark:text-red-400">{error}</p>
                     <button
-                        onClick={cargarDatos}
+                        onClick={cargarCalendario} // Modificado: antes era cargarDatos
                         className="mt-2 text-sm text-red-700 dark:text-red-300 underline"
                     >
                         Reintentar
@@ -572,15 +568,19 @@ const AlertasCorreo = () => {
 
             {/* Participantes y Detalles */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                {/* Lista de Participantes */}
+                {/* Lista de Participantes - MODIFICADO */}
                 <div className="lg:col-span-2">
                     <Card
-                        title={`Participantes de sesiones - ${meses[mesActual - 1]} ${añoActual}`}
-                        subtitle={`Lista de colaboradores programados para este mes. (${participantes.length} participantes)`}
+                        title={tituloParticipantes}
+                        subtitle={diaSeleccionado || participantes.length > 0 ? `Haz clic en un participante para ver sus detalles.` : 'Haz clic en un día del calendario con sesiones para ver los participantes.'}
                         actions={
-                            <Button variant="primary" onClick={agregarParticipante}>
-                                <span className="material-symbols-outlined">add_circle</span>
-                                Añadir Participante
+                            <Button variant="outline" onClick={handleMostrarTodosParticipantesMes} disabled={loadingTodosParticipantes}>
+                                {loadingTodosParticipantes ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                ) : (
+                                    <span className="material-symbols-outlined">groups</span>
+                                )}
+                                Mostrar participantes del mes
                             </Button>
                         }
                     >
@@ -676,8 +676,9 @@ const AlertasCorreo = () => {
                                 </table>
                             ) : (
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                    <span className="material-symbols-outlined text-4xl mb-2">group_off</span>
-                                    <p>No hay participantes en las sesiones de este mes</p>
+                                    <span className="material-symbols-outlined text-4xl mb-2">event_available</span>
+                                    <p>No hay participantes seleccionados.</p>
+                                    <p className="text-sm">Selecciona un día en el calendario o muestra todos los del mes.</p>
                                 </div>
                             )}
                         </div>
