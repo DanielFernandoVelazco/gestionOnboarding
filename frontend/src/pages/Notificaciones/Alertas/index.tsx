@@ -127,6 +127,59 @@ const AlertasCorreo = () => {
         return diasDestacados;
     };
 
+    // Function to get session type and color
+    const getSessionTypeAndColor = (sesion: any) => {
+        if (!sesion || !sesion.tipo) return { type: 'Otro', color: '#9E9E9E' };
+
+        const tipoNombre = sesion.tipo.nombre.toLowerCase();
+
+        if (tipoNombre.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
+        if (tipoNombre.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
+        if (tipoNombre.includes('data')) return { type: 'Capítulo Data', color: '#FFD100' };
+        if (tipoNombre.includes('cloud') || tipoNombre.includes('journey')) return { type: 'Journey to Cloud', color: '#E31937' };
+        if (tipoNombre.includes('bienvenida')) return { type: 'Bienvenida', color: '#4CAF50' };
+
+        return { type: 'Otro', color: '#9E9E9E' };
+    };
+
+    // Function to get event type and color
+    const getEventTypeAndColor = (evento: any) => {
+        if (!evento) return { type: 'Otro', color: '#9E9E9E' };
+
+        const tipo = evento.tipo.toLowerCase();
+
+        if (tipo.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
+        if (tipo.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
+        if (tipo.includes('data')) return { type: 'Capítulo Data', color: '#FFD100' };
+        if (tipo.includes('cloud') || tipo.includes('journey')) return { type: 'Journey to Cloud', color: '#E31937' };
+        if (tipo.includes('bienvenida')) return { type: 'Bienvenida', color: '#4CAF50' };
+
+        return { type: 'Otro', color: '#9E9E9E' };
+    };
+
+    // Get all session/event types for the legend
+    const getTiposEnCalendario = () => {
+        if (!calendario) return [];
+
+        const tipos = new Set();
+
+        calendario.semanas.forEach(semana => {
+            semana.forEach(dia => {
+                dia.sesiones.forEach(sesion => {
+                    const { type } = getSessionTypeAndColor(sesion);
+                    tipos.add(type);
+                });
+
+                dia.eventos.forEach(evento => {
+                    const { type } = getEventTypeAndColor(evento);
+                    tipos.add(type);
+                });
+            });
+        });
+
+        return Array.from(tipos);
+    };
+
     const renderCalendarioMes = (mesOffset: number) => {
         const mesRender = mesActual + mesOffset;
         const añoRender = añoActual;
@@ -179,6 +232,7 @@ const AlertasCorreo = () => {
                         // Verificar si hay eventos o sesiones en este día
                         let tieneEventos = false;
                         let tieneSesiones = false;
+                        let tiposEnDia: { type: string; color: string }[] = [];
 
                         if (calendario && esMesActual) {
                             calendario.semanas.forEach(semana => {
@@ -186,34 +240,59 @@ const AlertasCorreo = () => {
                                     if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
                                         tieneEventos = diaCalendario.eventos.length > 0;
                                         tieneSesiones = diaCalendario.sesiones.length > 0;
+
+                                        // Collect all types for this day
+                                        diaCalendario.sesiones.forEach(sesion => {
+                                            tiposEnDia.push(getSessionTypeAndColor(sesion));
+                                        });
+
+                                        diaCalendario.eventos.forEach(evento => {
+                                            tiposEnDia.push(getEventTypeAndColor(evento));
+                                        });
                                     }
                                 });
                             });
                         }
+
+                        // Get unique types for this day
+                        const tiposUnicos = tiposEnDia.filter((tipo, index, self) =>
+                            index === self.findIndex((t) => t.type === tipo.type)
+                        );
 
                         return (
                             <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
                                 {(esDestacado || tieneEventos || tieneSesiones) ? (
                                     <>
                                         <span className={`absolute -top-1 -left-1 flex items-center justify-center w-8 h-8 rounded-full ${esHoy
-                                                ? 'bg-primary text-white'
-                                                : tieneSesiones
-                                                    ? 'bg-blue-500 text-white'
-                                                    : tieneEventos
-                                                        ? 'bg-green-500 text-white'
-                                                        : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40'
-                                            }`}>
+                                            ? 'bg-primary text-white'
+                                            : tiposUnicos.length > 0
+                                                ? ''
+                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40'
+                                            }`}
+                                            style={{
+                                                backgroundColor: tiposUnicos.length > 0 ? tiposUnicos[0].color : undefined
+                                            }}
+                                        >
                                             {dia}
                                         </span>
-                                        <div className={`absolute top-6 left-1/2 transform -translate-x-1/2 w-2 h-2 rounded-full ${esHoy ? 'bg-primary' : tieneSesiones ? 'bg-blue-500' : tieneEventos ? 'bg-green-500' : 'bg-primary/40'
-                                            }`}></div>
+                                        {tiposUnicos.length > 0 && (
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex gap-1">
+                                                {tiposUnicos.slice(0, 3).map((tipo, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="w-1.5 h-1.5 rounded-full"
+                                                        style={{ backgroundColor: tipo.color }}
+                                                    ></div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </>
                                 ) : (
                                     <span className={`p-1 ${esHoy
-                                            ? 'text-primary font-bold'
-                                            : (mesOffset !== 0 && (dia <= 3 || (mesOffset === -1 && dia > 28)))
-                                                ? 'text-gray-400 dark:text-gray-600'
-                                                : ''
+                                        ? 'text-primary font-bold'
+                                        : (mesOffset !== 0 && (dia <= 3 || (mesOffset === -1 && dia > 28)))
+                                            ? 'text-gray-400 dark:text-gray-600'
+                                            : ''
                                         }`}>
                                         {dia}
                                     </span>
@@ -377,6 +456,7 @@ const AlertasCorreo = () => {
     }
 
     const estadisticas = calcularEstadisticas();
+    const tiposEnCalendario = getTiposEnCalendario();
 
     return (
         <div className="space-y-8">
@@ -437,16 +517,56 @@ const AlertasCorreo = () => {
                     {renderCalendarioMes(1)}
                 </div>
 
-                {/* Leyenda */}
-                <div className="flex justify-center mt-4 gap-4 text-xs">
-                    <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                        <span>Sesiones</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                        <span>Eventos</span>
-                    </div>
+                {/* Leyenda actualizada */}
+                <div className="flex justify-center mt-4 flex-wrap gap-4 text-xs">
+                    {tiposEnCalendario.length > 0 ? (
+                        tiposEnCalendario.map((tipo: any, index) => {
+                            // Find the color for this type
+                            let color = '#9E9E9E'; // Default gray
+
+                            if (tipo === 'Capítulo Frontend') color = '#00448D';
+                            else if (tipo === 'Capítulo Backend') color = '#FF6B35';
+                            else if (tipo === 'Capítulo Data') color = '#FFD100';
+                            else if (tipo === 'Journey to Cloud') color = '#E31937';
+                            else if (tipo === 'Bienvenida') color = '#4CAF50';
+                            else if (tipo === 'Otro') color = '#9E9E9E';
+
+                            return (
+                                <div key={index} className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                    <span>{tipo}</span>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        // Default legend if no events/sessions
+                        <>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#00448D' }}></div>
+                                <span>Capítulo Frontend</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FF6B35' }}></div>
+                                <span>Capítulo Backend</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFD100' }}></div>
+                                <span>Capítulo Data</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#E31937' }}></div>
+                                <span>Journey to Cloud</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#4CAF50' }}></div>
+                                <span>Bienvenida</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#9E9E9E' }}></div>
+                                <span>Otro</span>
+                            </div>
+                        </>
+                    )}
                 </div>
             </Card>
 
