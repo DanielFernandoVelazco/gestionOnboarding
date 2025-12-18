@@ -1,6 +1,63 @@
 import api from '../api/axios.config';
-import { Colaborador } from './colaboradores.service';
 
+// Interfaces del calendario
+export interface EventoCalendario {
+    id: string;
+    titulo: string;
+    descripcion?: string;
+    tipo: string;
+    fechaInicio: string;
+    fechaFin?: string;
+    todoElDia: boolean;
+    color: string;
+    sesion?: {
+        id: string;
+        titulo: string;
+        tipo?: {
+            nombre: string;
+            color: string;
+        };
+    };
+    creadoPor?: {
+        id: string;
+        nombre: string;
+        email: string;
+    };
+    activo: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface SesionCalendario {
+    id: string;
+    titulo: string;
+    descripcion?: string;
+    fechaInicio: string;
+    fechaFin: string;
+    estado: string;
+    tipo?: {
+        id: string;
+        nombre: string;
+        color: string;
+    };
+    participantes?: any[];
+}
+
+export interface DiaCalendario {
+    fecha: Date;
+    esMesActual: boolean;
+    eventos: EventoCalendario[];
+    sesiones: SesionCalendario[];
+}
+
+export interface MesCalendario {
+    año: number;
+    mes: number;
+    nombreMes: string;
+    semanas: DiaCalendario[][];
+}
+
+// Interfaces de notificaciones
 export interface Notificacion {
     id: string;
     tipo: 'onboarding_agendado' | 'recordatorio_sesion' | 'cambio_estado' | 'nuevo_colaborador' | 'sistema';
@@ -45,8 +102,87 @@ export interface ParticipanteSesion {
     } | null;
 }
 
+// Definición de Colaborador (necesario para la función getParticipantesSesion)
+export interface Colaborador {
+    id: string;
+    nombreCompleto: string;
+    email: string;
+    telefono?: string;
+    departamento?: string;
+    puesto?: string;
+    fechaIngreso: string;
+    fechaOnboardingTecnico?: string;
+    lugarAsignacion?: string;
+    estadoTecnico?: 'pendiente' | 'en_progreso' | 'completado';
+    tipoOnboardingTecnico?: {
+        id: string;
+        nombre: string;
+        color: string;
+    } | null;
+}
+
 export const notificacionesService = {
-    // Obtener participantes reales de la base de datos
+    // Calendario - Obtener eventos del mes
+    getCalendarioMes: async (año: number, mes: number): Promise<MesCalendario> => {
+        try {
+            // Obtener eventos del calendario
+            const fechaDesde = new Date(año, mes - 1, 1);
+            const fechaHasta = new Date(año, mes, 0);
+
+            const [eventosResponse, sesionesResponse] = await Promise.all([
+                api.get('/calendario/eventos', {
+                    params: {
+                        fechaDesde: fechaDesde.toISOString().split('T')[0],
+                        fechaHasta: fechaHasta.toISOString().split('T')[0],
+                    },
+                }),
+                api.get('/onboarding/sesiones/mes/' + año + '/' + mes),
+            ]);
+
+            const eventos: EventoCalendario[] = eventosResponse.data || [];
+            const sesiones: SesionCalendario[] = sesionesResponse.data || [];
+
+            // Generar semanas del mes
+            const semanas = generarSemanas(año, mes - 1, eventos, sesiones);
+
+            // Nombres de meses en español
+            const nombresMeses = [
+                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+            ];
+
+            return {
+                año,
+                mes,
+                nombreMes: nombresMeses[mes - 1],
+                semanas,
+            };
+        } catch (error) {
+            console.error('Error al cargar calendario:', error);
+            // Retornar calendario vacío en caso de error
+            return {
+                año,
+                mes,
+                nombreMes: new Date(año, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long' }),
+                semanas: [],
+            };
+        }
+    },
+
+    // Obtener próximos eventos
+    getEventosProximos: async (limite: number = 10) => {
+        try {
+            const response = await api.get('/calendario/eventos/proximos', {
+                params: { limite },
+            });
+            return response.data;
+        } catch (error) {
+            console.error('Error al cargar eventos próximos:', error);
+            return [];
+        }
+    },
+
+    // Obtener participantes reales de la base de datos (versión mejorada del primer archivo)
     getParticipantesSesion: async (sesionId: string): Promise<ParticipanteSesion[]> => {
         try {
             // Primero, obtener todos los colaboradores
@@ -139,7 +275,18 @@ export const notificacionesService = {
         }
     },
 
-    // Métodos existentes...
+    // Obtener sesiones próximas
+    getSesionesProximas: async () => {
+        try {
+            const response = await api.get('/onboarding/sesiones/proximas');
+            return response.data;
+        } catch (error) {
+            console.error('Error al cargar sesiones próximas:', error);
+            return [];
+        }
+    },
+
+    // Métodos de notificaciones
     getNotificaciones: async (filters?: any) => {
         const params = new URLSearchParams();
 
@@ -158,7 +305,6 @@ export const notificacionesService = {
         }
     },
 
-    // Los demás métodos se mantienen igual...
     getNotificacionById: async (id: string) => {
         const response = await api.get(`/notificaciones/${id}`);
         return response.data;
@@ -209,3 +355,67 @@ export const notificacionesService = {
         }
     },
 };
+
+// Función auxiliar para generar semanas
+function generarSemanas(
+    año: number,
+    mes: number,
+    eventos: EventoCalendario[],
+    sesiones: SesionCalendario[],
+): DiaCalendario[][] {
+    const primerDia = new Date(año, mes, 1);
+    const ultimoDia = new Date(año, mes + 1, 0);
+
+    // Ajustar primer día a lunes
+    const primerDiaSemana = new Date(primerDia);
+    const diaSemana = primerDia.getDay();
+    primerDiaSemana.setDate(primerDia.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
+
+    // Ajustar último día a domingo
+    const ultimoDiaSemana = new Date(ultimoDia);
+    const diaSemanaUltimo = ultimoDia.getDay();
+    if (diaSemanaUltimo !== 0) {
+        ultimoDiaSemana.setDate(ultimoDia.getDate() + (7 - diaSemanaUltimo));
+    }
+
+    const semanas: DiaCalendario[][] = [];
+    let fechaActual = new Date(primerDiaSemana);
+
+    while (fechaActual <= ultimoDiaSemana) {
+        const semana: DiaCalendario[] = [];
+
+        for (let i = 0; i < 7; i++) {
+            const fecha = new Date(fechaActual);
+            const esMesActual = fecha.getMonth() === mes;
+
+            // Filtrar eventos para este día
+            const eventosDia = eventos.filter(evento => {
+                const eventoFecha = new Date(evento.fechaInicio);
+                return eventoFecha.getDate() === fecha.getDate() &&
+                    eventoFecha.getMonth() === fecha.getMonth() &&
+                    eventoFecha.getFullYear() === fecha.getFullYear();
+            });
+
+            // Filtrar sesiones para este día
+            const sesionesDia = sesiones.filter(sesion => {
+                const sesionFecha = new Date(sesion.fechaInicio);
+                return sesionFecha.getDate() === fecha.getDate() &&
+                    sesionFecha.getMonth() === fecha.getMonth() &&
+                    sesionFecha.getFullYear() === fecha.getFullYear();
+            });
+
+            semana.push({
+                fecha,
+                esMesActual,
+                eventos: eventosDia,
+                sesiones: sesionesDia,
+            });
+
+            fechaActual.setDate(fechaActual.getDate() + 1);
+        }
+
+        semanas.push(semana);
+    }
+
+    return semanas;
+}
