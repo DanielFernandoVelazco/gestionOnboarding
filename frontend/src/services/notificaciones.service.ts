@@ -182,74 +182,34 @@ export const notificacionesService = {
         }
     },
 
-    // Obtener participantes reales de la base de datos (versión mejorada del primer archivo)
+    // MODIFICADO: Obtener participantes de una sesión específica
     getParticipantesSesion: async (sesionId: string): Promise<ParticipanteSesion[]> => {
         try {
-            // Primero, obtener todos los colaboradores
-            const response = await api.get('/colaboradores?limit=1000');
-            const colaboradores: Colaborador[] = response.data.data;
+            // Hacer una llamada a la API para obtener los detalles de la sesión específica
+            const response = await api.get(`/onboarding/sesiones/${sesionId}`);
 
-            // Filtrar colaboradores que tengan fecha de onboarding técnico (simulan estar en sesión)
-            // En una implementación real, esto vendría de una relación sesión-colaborador
-            const participantes = colaboradores
-                .filter(colaborador => colaborador.fechaOnboardingTecnico)
-                .map(colaborador => ({
-                    id: colaborador.id,
-                    nombreCompleto: colaborador.nombreCompleto,
-                    email: colaborador.email,
-                    telefono: colaborador.telefono,
-                    departamento: colaborador.departamento,
-                    puesto: colaborador.puesto,
-                    fechaIngreso: colaborador.fechaIngreso,
-                    fechaOnboardingTecnico: colaborador.fechaOnboardingTecnico,
-                    lugarAsignacion: colaborador.lugarAsignacion,
-                    estadoTecnico: colaborador.estadoTecnico,
-                    tipoOnboardingTecnico: colaborador.tipoOnboardingTecnico,
-                }));
+            // Extraer los participantes de la respuesta
+            const participantes = response.data.participantes || [];
 
-            return participantes;
+            // Mapear los datos al formato esperado
+            return participantes.map((participante: { id: any; nombreCompleto: any; email: any; telefono: any; departamento: any; puesto: any; fechaIngreso: any; fechaOnboardingTecnico: any; lugarAsignacion: any; estadoTecnico: any; tipoOnboardingTecnico: any; }) => ({
+                id: participante.id,
+                nombreCompleto: participante.nombreCompleto,
+                email: participante.email,
+                telefono: participante.telefono,
+                departamento: participante.departamento,
+                puesto: participante.puesto,
+                fechaIngreso: participante.fechaIngreso,
+                fechaOnboardingTecnico: participante.fechaOnboardingTecnico,
+                lugarAsignacion: participante.lugarAsignacion,
+                estadoTecnico: participante.estadoTecnico,
+                tipoOnboardingTecnico: participante.tipoOnboardingTecnico,
+            }));
         } catch (error) {
-            console.error('Error al cargar participantes:', error);
+            console.error('Error al cargar participantes de la sesión:', error);
 
-            // Datos de ejemplo en caso de error
-            return [
-                {
-                    id: '1',
-                    nombreCompleto: 'Carlos Santana',
-                    email: 'c.santana@empresa.com',
-                    telefono: '+1 234 567 890',
-                    departamento: 'Tecnología',
-                    puesto: 'Desarrollador Backend',
-                    fechaIngreso: '2024-07-01',
-                    fechaOnboardingTecnico: '2024-07-16',
-                    lugarAsignacion: 'capitulo_backend',
-                    estadoTecnico: 'completado',
-                },
-                {
-                    id: '2',
-                    nombreCompleto: 'Elena Rodriguez',
-                    email: 'e.rodriguez@empresa.com',
-                    telefono: '+1 234 567 891',
-                    departamento: 'Tecnología',
-                    puesto: 'Desarrolladora Frontend',
-                    fechaIngreso: '2024-07-01',
-                    fechaOnboardingTecnico: '2024-07-16',
-                    lugarAsignacion: 'capitulo_frontend',
-                    estadoTecnico: 'en_progreso',
-                },
-                {
-                    id: '3',
-                    nombreCompleto: 'Juan Pérez',
-                    email: 'j.perez@empresa.com',
-                    telefono: '+1 234 567 892',
-                    departamento: 'Tecnología',
-                    puesto: 'Desarrollador Backend',
-                    fechaIngreso: '2024-07-01',
-                    fechaOnboardingTecnico: '2024-07-16',
-                    lugarAsignacion: 'capitulo_backend',
-                    estadoTecnico: 'pendiente',
-                },
-            ];
+            // En caso de error, devolver un array vacío
+            return [];
         }
     },
 
