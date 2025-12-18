@@ -28,7 +28,7 @@ const AlertasCorreo = () => {
     ];
 
     useEffect(() => {
-        cargarCalendario(); // Modificado: antes era cargarDatos()
+        cargarCalendario();
     }, [mesActual, añoActual]);
 
     useEffect(() => {
@@ -58,6 +58,7 @@ const AlertasCorreo = () => {
     // NUEVA FUNCIÓN: cargar participantes de una sesión específica
     const cargarParticipantesPorSesion = async (sesionId: string) => {
         try {
+            // Usar la ruta correcta para obtener participantes de una sesión específica
             const participantesData = await notificacionesService.getParticipantesSesion(sesionId);
             setParticipantes(participantesData);
             setSesionSeleccionada(sesionId);
@@ -77,12 +78,12 @@ const AlertasCorreo = () => {
     const handleDiaClick = (dia: number) => {
         if (!calendario) return;
 
-        const sesionesDelDia: string[] = [];
+        const sesionesDelDia: any[] = [];
         calendario.semanas.forEach(semana => {
             semana.forEach(diaCalendario => {
                 if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
                     diaCalendario.sesiones.forEach(sesion => {
-                        sesionesDelDia.push(sesion.id);
+                        sesionesDelDia.push(sesion);
                     });
                 }
             });
@@ -90,7 +91,23 @@ const AlertasCorreo = () => {
 
         if (sesionesDelDia.length > 0) {
             setDiaSeleccionado(dia);
-            cargarParticipantesPorSesion(sesionesDelDia[0]);
+            // Si hay más de una sesión, mostramos un diálogo para seleccionar
+            if (sesionesDelDia.length === 1) {
+                cargarParticipantesPorSesion(sesionesDelDia[0].id);
+            } else {
+                // Si hay múltiples sesiones, mostramos un diálogo para seleccionar
+                const sesionSeleccionada = window.prompt(
+                    `Hay ${sesionesDelDia.length} sesiones en este día. Selecciona una:\n\n` +
+                    sesionesDelDia.map((s, i) => `${i + 1}. ${s.titulo}`).join('\n')
+                );
+
+                if (sesionSeleccionada) {
+                    const indice = parseInt(sesionSeleccionada) - 1;
+                    if (indice >= 0 && indice < sesionesDelDia.length) {
+                        cargarParticipantesPorSesion(sesionesDelDia[indice].id);
+                    }
+                }
+            }
         }
     };
 
@@ -107,6 +124,7 @@ const AlertasCorreo = () => {
         setDiaSeleccionado(null);
 
         try {
+            // Obtener todos los IDs de sesión del mes
             const sesionesIds = new Set<string>();
             calendario.semanas.forEach(semana => {
                 semana.forEach(dia => {
@@ -121,11 +139,14 @@ const AlertasCorreo = () => {
                 return;
             }
 
+            // Hacer llamadas concurrentes para obtener todos los participantes de cada sesión
             const promesasParticipantes = Array.from(sesionesIds).map(id =>
                 notificacionesService.getParticipantesSesion(id)
             );
 
             const resultados = await Promise.all(promesasParticipantes);
+
+            // Aplanar el array de resultados y eliminar duplicados por ID
             const todosParticipantes = resultados.flat();
             const participantesUnicos = todosParticipantes.filter((participante, index, self) =>
                 index === self.findIndex((p) => p.id === participante.id)
@@ -198,9 +219,13 @@ const AlertasCorreo = () => {
 
     // Function to get session type and color
     const getSessionTypeAndColor = (sesion: any) => {
-        if (!sesion || !sesion.tipo) return { type: 'Otro', color: '#9E9E9E' };
+        if (!sesion) return { type: 'Otro', color: '#9E9E9E' };
 
-        const tipoNombre = sesion.tipo.nombre.toLowerCase();
+        // Intentar obtener el tipo desde diferentes propiedades
+        const tipoNombre = sesion.tipo?.nombre?.toLowerCase() ||
+            sesion.tipo?.toLowerCase() ||
+            sesion.lugarAsignacion?.toLowerCase() ||
+            '';
 
         if (tipoNombre.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
         if (tipoNombre.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
@@ -215,7 +240,7 @@ const AlertasCorreo = () => {
     const getEventTypeAndColor = (evento: any) => {
         if (!evento) return { type: 'Otro', color: '#9E9E9E' };
 
-        const tipo = evento.tipo.toLowerCase();
+        const tipo = evento.tipo?.toLowerCase() || '';
 
         if (tipo.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
         if (tipo.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
@@ -226,7 +251,7 @@ const AlertasCorreo = () => {
         return { type: 'Otro', color: '#9E9E9E' };
     };
 
-    // Get all session/event types for the legend
+    // Get all session/event types for legend
     const getTiposEnCalendario = () => {
         if (!calendario) return [];
 
@@ -299,11 +324,14 @@ const AlertasCorreo = () => {
                             añoAjustado === hoy.getFullYear();
 
                         let tieneSesiones = false;
+                        let sesionesDelDia: any[] = [];
+
                         if (calendario && esMesActual) {
                             calendario.semanas.forEach(semana => {
                                 semana.forEach(diaCalendario => {
                                     if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
                                         tieneSesiones = diaCalendario.sesiones.length > 0;
+                                        sesionesDelDia = diaCalendario.sesiones;
                                     }
                                 });
                             });
@@ -311,18 +339,43 @@ const AlertasCorreo = () => {
 
                         const esDiaSeleccionado = esMesActual && dia === diaSeleccionado;
 
+                        // Obtener los colores de las sesiones del día
+                        const coloresSesiones = sesionesDelDia.map(sesion => {
+                            const { color } = getSessionTypeAndColor(sesion);
+                            return color;
+                        });
+
+                        // Eliminar colores duplicados
+                        const coloresUnicos = [...new Set(coloresSesiones)];
+
                         return (
                             <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
                                 {tieneSesiones ? (
                                     <button
                                         onClick={() => handleDiaClick(dia)}
                                         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${esDiaSeleccionado
-                                                ? 'bg-primary text-white ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-800'
-                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40 hover:bg-primary/30'
+                                            ? 'bg-primary text-white ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-800'
+                                            : coloresUnicos.length > 0
+                                                ? ''
+                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40'
                                             }`}
+                                        style={{
+                                            backgroundColor: coloresUnicos.length > 0 ? coloresUnicos[0] : undefined
+                                        }}
                                         title={`Ver sesiones del día ${dia}`}
                                     >
                                         {dia}
+                                        {coloresUnicos.length > 1 && (
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex gap-1">
+                                                {coloresUnicos.slice(0, 3).map((color, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="w-1.5 h-1.5 rounded-full"
+                                                        style={{ backgroundColor: color }}
+                                                    ></div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </button>
                                 ) : (
                                     <span className={`p-1 ${esHoy ? 'text-primary font-bold' : ''}`}>
@@ -470,7 +523,7 @@ const AlertasCorreo = () => {
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                     <p className="text-red-600 dark:text-red-400">{error}</p>
                     <button
-                        onClick={cargarCalendario} // Modificado: antes era cargarDatos
+                        onClick={cargarCalendario}
                         className="mt-2 text-sm text-red-700 dark:text-red-300 underline"
                     >
                         Reintentar
@@ -610,7 +663,6 @@ const AlertasCorreo = () => {
                                             <th className="px-6 py-3 font-medium">Departamento</th>
                                             <th className="px-6 py-3 font-medium">Sesión</th>
                                             <th className="px-6 py-3 font-medium">Estado</th>
-                                            <th className="px-6 py-3 font-medium text-center">Acciones</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -657,18 +709,6 @@ const AlertasCorreo = () => {
                                                     <span className={`badge ${getEstadoColor(participante.estadoTecnico)}`}>
                                                         {participante.estadoTecnico || 'pendiente'}
                                                     </span>
-                                                </td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            eliminarParticipante(participante.id);
-                                                        }}
-                                                        className="text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 transition-colors"
-                                                        title="Eliminar de la sesión"
-                                                    >
-                                                        <span className="material-symbols-outlined text-xl">delete</span>
-                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -722,15 +762,18 @@ const AlertasCorreo = () => {
                                 </div>
 
                                 {/* Información detallada */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="space-y-4">
+                                    {/* Correo Electrónico en una fila completa para evitar solapamientos */}
                                     <div>
                                         <label className="text-xs text-gray-500 dark:text-gray-400">
                                             Correo Electrónico
                                         </label>
-                                        <p className="text-sm text-gray-800 dark:text-gray-200">
+                                        <p className="text-sm text-gray-800 dark:text-gray-200 break-all">
                                             {participanteSeleccionado.email}
                                         </p>
                                     </div>
+
+                                    {/* Teléfono también en una fila completa para una mejor legibilidad */}
                                     <div>
                                         <label className="text-xs text-gray-500 dark:text-gray-400">
                                             Teléfono
@@ -739,35 +782,39 @@ const AlertasCorreo = () => {
                                             {participanteSeleccionado.telefono || 'No disponible'}
                                         </p>
                                     </div>
-                                    <div>
-                                        <label className="text-xs text-gray-500 dark:text-gray-400">
-                                            Departamento
-                                        </label>
-                                        <p className="text-sm text-gray-800 dark:text-gray-200">
-                                            {participanteSeleccionado.departamento || 'No especificado'}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <label className="text-xs text-gray-500 dark:text-gray-400">
-                                            Fecha de Ingreso
-                                        </label>
-                                        <p className="text-sm text-gray-800 dark:text-gray-200">
-                                            {participanteSeleccionado.fechaIngreso
-                                                ? new Date(participanteSeleccionado.fechaIngreso).toLocaleDateString('es-ES')
-                                                : 'No disponible'
-                                            }
-                                        </p>
-                                    </div>
-                                    {participanteSeleccionado.fechaOnboardingTecnico && (
+
+                                    {/* El resto de la información en una cuadrícula de 2 columnas para optimizar el espacio */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-xs text-gray-500 dark:text-gray-400">
-                                                Fecha Onboarding Técnico
+                                                Departamento
                                             </label>
                                             <p className="text-sm text-gray-800 dark:text-gray-200">
-                                                {new Date(participanteSeleccionado.fechaOnboardingTecnico).toLocaleDateString('es-ES')}
+                                                {participanteSeleccionado.departamento || 'No especificado'}
                                             </p>
                                         </div>
-                                    )}
+                                        <div>
+                                            <label className="text-xs text-gray-500 dark:text-gray-400">
+                                                Fecha de Ingreso
+                                            </label>
+                                            <p className="text-sm text-gray-800 dark:text-gray-200">
+                                                {participanteSeleccionado.fechaIngreso
+                                                    ? new Date(participanteSeleccionado.fechaIngreso).toLocaleDateString('es-ES')
+                                                    : 'No disponible'
+                                                }
+                                            </p>
+                                        </div>
+                                        {participanteSeleccionado.fechaOnboardingTecnico && (
+                                            <div>
+                                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                                    Fecha Onboarding Técnico
+                                                </label>
+                                                <p className="text-sm text-gray-800 dark:text-gray-200">
+                                                    {new Date(participanteSeleccionado.fechaOnboardingTecnico).toLocaleDateString('es-ES')}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
 
                                 {/* Sesión Asignada */}
