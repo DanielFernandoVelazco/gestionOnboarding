@@ -20,13 +20,17 @@ import {
 import { NotificacionesService } from './notificaciones.service';
 import { JwtAuthGuard } from 'src/common/guards/jwt-auth.guard';
 import { TipoNotificacion, EstadoNotificacion } from './entities/notificacion.entity';
+import { MailService } from 'src/modules/notificaciones/mail.service';
 
 @ApiTags('notificaciones')
 @Controller('notificaciones')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class NotificacionesController {
-    constructor(private readonly notificacionesService: NotificacionesService) { }
+    constructor(
+        private readonly notificacionesService: NotificacionesService,
+        private readonly mailService: MailService,
+    ) { }
 
     @Get()
     @ApiOperation({ summary: 'Obtener todas las notificaciones con filtros' })
@@ -88,17 +92,31 @@ export class NotificacionesController {
         return this.notificacionesService.notificarOnboardingAgendado(sesionId, req.user);
     }
 
+    // En el controlador, modifica el endpoint de prueba:
     @Post('test')
     @ApiOperation({ summary: 'Enviar correo de prueba' })
     @ApiResponse({ status: 200, description: 'Correo de prueba enviado' })
-    async testEmail(@Body() body: { email: string }) {
-        const testContent = `
-      <h1>📧 Correo de Prueba</h1>
-      <p>Este es un correo de prueba del sistema de gestión de onboarding.</p>
-      <p>Fecha: ${new Date().toLocaleString()}</p>
-    `;
+    async testEmail(@Body() body: { email: string }, @Request() req) {
+        const success = await this.mailService.sendTestEmail(body.email);
 
-        // Usar el mail service directamente
-        return true;
+        const notificacion = await this.notificacionesService.createNotificacion({
+            tipo: TipoNotificacion.SISTEMA,
+            asunto: '✅ Correo de prueba enviado',
+            contenido: 'Correo de prueba del sistema de notificaciones',
+            destinatarioId: req.user.id,
+            metadata: {
+                testEmail: body.email,
+                timestamp: new Date().toISOString(),
+            },
+            creadoPor: req.user,
+        });
+
+        return {
+            success,
+            messageId: notificacion.id,
+            message: success
+                ? `Correo de prueba enviado a ${body.email}`
+                : `Error al enviar correo de prueba a ${body.email}`,
+        };
     }
 }
