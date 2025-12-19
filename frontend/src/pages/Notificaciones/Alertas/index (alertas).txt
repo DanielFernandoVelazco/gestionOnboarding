@@ -1,0 +1,886 @@
+import { useState, useEffect } from 'react';
+import Card from '../../../components/ui/Card';
+import Button from '../../../components/ui/Button';
+import Input from '../../../components/ui/Input';
+import { notificacionesService, ParticipanteSesion, MesCalendario, Notificacion } from '../../../services/notificaciones.service';
+
+const AlertasCorreo = () => {
+    const [mesActual, setMesActual] = useState(new Date().getMonth() + 1);
+    const [añoActual, setAñoActual] = useState(new Date().getFullYear());
+    const [calendario, setCalendario] = useState<MesCalendario | null>(null);
+    const [participantes, setParticipantes] = useState<ParticipanteSesion[]>([]);
+    const [participanteSeleccionado, setParticipanteSeleccionado] = useState<ParticipanteSesion | null>(null);
+    const [busqueda, setBusqueda] = useState('');
+    const [loading, setLoading] = useState(true);
+    const [sesionSeleccionada, setSesionSeleccionada] = useState<string>('');
+    const [notificaciones, setNotificaciones] = useState<Notificacion[]>([]);
+    const [loadingNotificaciones, setLoadingNotificaciones] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    // NUEVOS ESTADOS
+    const [loadingTodosParticipantes, setLoadingTodosParticipantes] = useState(false);
+    const [diaSeleccionado, setDiaSeleccionado] = useState<number | null>(null);
+
+    // Nombres de meses en español
+    const meses = [
+        'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+        'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+    ];
+
+    useEffect(() => {
+        cargarCalendario();
+    }, [mesActual, añoActual]);
+
+    useEffect(() => {
+        cargarNotificaciones();
+    }, []);
+
+    // REEMPLAZADO: función cargarDatos por cargarCalendario
+    const cargarCalendario = async () => {
+        setLoading(true);
+        setError(null);
+        // Limpiamos los estados relacionados con participantes al cambiar de mes
+        setParticipantes([]);
+        setParticipanteSeleccionado(null);
+        setDiaSeleccionado(null);
+
+        try {
+            const calendarioData = await notificacionesService.getCalendarioMes(añoActual, mesActual);
+            setCalendario(calendarioData);
+        } catch (error: any) {
+            setError(error.message || 'Error al cargar el calendario');
+            console.error('Error al cargar calendario:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // NUEVA FUNCIÓN: cargar participantes de una sesión específica
+    const cargarParticipantesPorSesion = async (sesionId: string) => {
+        try {
+            // Usar la ruta correcta para obtener participantes de una sesión específica
+            const participantesData = await notificacionesService.getParticipantesSesion(sesionId);
+            setParticipantes(participantesData);
+            setSesionSeleccionada(sesionId);
+            if (participantesData.length > 0) {
+                setParticipanteSeleccionado(participantesData[0]);
+            } else {
+                setParticipanteSeleccionado(null);
+            }
+        } catch (error: any) {
+            console.error('Error al cargar participantes de la sesión:', error);
+            setParticipantes([]);
+            setParticipanteSeleccionado(null);
+        }
+    };
+
+    // NUEVO MANEJADOR: al hacer clic en un día del calendario
+    const handleDiaClick = (dia: number) => {
+        if (!calendario) return;
+
+        const sesionesDelDia: any[] = [];
+        calendario.semanas.forEach(semana => {
+            semana.forEach(diaCalendario => {
+                if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
+                    diaCalendario.sesiones.forEach(sesion => {
+                        sesionesDelDia.push(sesion);
+                    });
+                }
+            });
+        });
+
+        if (sesionesDelDia.length > 0) {
+            setDiaSeleccionado(dia);
+            // Si hay más de una sesión, mostramos un diálogo para seleccionar
+            if (sesionesDelDia.length === 1) {
+                cargarParticipantesPorSesion(sesionesDelDia[0].id);
+            } else {
+                // Si hay múltiples sesiones, mostramos un diálogo para seleccionar
+                const sesionSeleccionada = window.prompt(
+                    `Hay ${sesionesDelDia.length} sesiones en este día. Selecciona una:\n\n` +
+                    sesionesDelDia.map((s, i) => `${i + 1}. ${s.titulo}`).join('\n')
+                );
+
+                if (sesionSeleccionada) {
+                    const indice = parseInt(sesionSeleccionada) - 1;
+                    if (indice >= 0 && indice < sesionesDelDia.length) {
+                        cargarParticipantesPorSesion(sesionesDelDia[indice].id);
+                    }
+                }
+            }
+        }
+    };
+
+    // NUEVA FUNCIÓN: mostrar todos los participantes del mes
+    const handleMostrarTodosParticipantesMes = async () => {
+        if (!calendario) {
+            alert('El calendario no está cargado.');
+            return;
+        }
+
+        setLoadingTodosParticipantes(true);
+        setParticipantes([]);
+        setParticipanteSeleccionado(null);
+        setDiaSeleccionado(null);
+
+        try {
+            // Obtener todos los IDs de sesión del mes
+            const sesionesIds = new Set<string>();
+            calendario.semanas.forEach(semana => {
+                semana.forEach(dia => {
+                    dia.sesiones.forEach(sesion => {
+                        sesionesIds.add(sesion.id);
+                    });
+                });
+            });
+
+            if (sesionesIds.size === 0) {
+                alert('No hay sesiones este mes.');
+                return;
+            }
+
+            // Hacer llamadas concurrentes para obtener todos los participantes de cada sesión
+            const promesasParticipantes = Array.from(sesionesIds).map(id =>
+                notificacionesService.getParticipantesSesion(id)
+            );
+
+            const resultados = await Promise.all(promesasParticipantes);
+
+            // Aplanar el array de resultados y eliminar duplicados por ID
+            const todosParticipantes = resultados.flat();
+            const participantesUnicos = todosParticipantes.filter((participante, index, self) =>
+                index === self.findIndex((p) => p.id === participante.id)
+            );
+
+            setParticipantes(participantesUnicos);
+            if (participantesUnicos.length > 0) {
+                setParticipanteSeleccionado(participantesUnicos[0]);
+            }
+
+        } catch (error: any) {
+            console.error('Error al cargar todos los participantes del mes:', error);
+            alert('No se pudieron cargar los participantes del mes.');
+        } finally {
+            setLoadingTodosParticipantes(false);
+        }
+    };
+
+    const cargarNotificaciones = async () => {
+        setLoadingNotificaciones(true);
+        try {
+            const notificacionesData = await notificacionesService.getNotificaciones();
+            setNotificaciones(notificacionesData.data || []);
+        } catch (error) {
+            console.error('Error al cargar notificaciones:', error);
+        } finally {
+            setLoadingNotificaciones(false);
+        }
+    };
+
+    const handleAnteriorMes = () => {
+        if (mesActual === 1) {
+            setMesActual(12);
+            setAñoActual(añoActual - 1);
+        } else {
+            setMesActual(mesActual - 1);
+        }
+    };
+
+    const handleSiguienteMes = () => {
+        if (mesActual === 12) {
+            setMesActual(1);
+            setAñoActual(añoActual + 1);
+        } else {
+            setMesActual(mesActual + 1);
+        }
+    };
+
+    const participantesFiltrados = participantes.filter(p =>
+        p.nombreCompleto?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        p.email?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        p.departamento?.toLowerCase().includes(busqueda.toLowerCase()) ||
+        p.puesto?.toLowerCase().includes(busqueda.toLowerCase())
+    );
+
+    // Function to get session type and color
+    const getSessionTypeAndColor = (sesion: any) => {
+        if (!sesion) return { type: 'Otro', color: '#9E9E9E' };
+
+        // Intentar obtener el tipo desde diferentes propiedades
+        const tipoNombre = sesion.tipo?.nombre?.toLowerCase() ||
+            sesion.tipo?.toLowerCase() ||
+            sesion.lugarAsignacion?.toLowerCase() ||
+            '';
+
+        if (tipoNombre.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
+        if (tipoNombre.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
+        if (tipoNombre.includes('data')) return { type: 'Capítulo Data', color: '#FFD100' };
+        if (tipoNombre.includes('cloud') || tipoNombre.includes('journey')) return { type: 'Journey to Cloud', color: '#E31937' };
+        if (tipoNombre.includes('bienvenida')) return { type: 'Bienvenida', color: '#4CAF50' };
+
+        return { type: 'Otro', color: '#9E9E9E' };
+    };
+
+    // Function to get event type and color
+    const getEventTypeAndColor = (evento: any) => {
+        if (!evento) return { type: 'Otro', color: '#9E9E9E' };
+
+        const tipo = evento.tipo?.toLowerCase() || '';
+
+        if (tipo.includes('frontend')) return { type: 'Capítulo Frontend', color: '#00448D' };
+        if (tipo.includes('backend')) return { type: 'Capítulo Backend', color: '#FF6B35' };
+        if (tipo.includes('data')) return { type: 'Capítulo Data', color: '#FFD100' };
+        if (tipo.includes('cloud') || tipo.includes('journey')) return { type: 'Journey to Cloud', color: '#E31937' };
+        if (tipo.includes('bienvenida')) return { type: 'Bienvenida', color: '#4CAF50' };
+
+        return { type: 'Otro', color: '#9E9E9E' };
+    };
+
+    // Get all session/event types for legend
+    const getTiposEnCalendario = () => {
+        if (!calendario) return [];
+
+        const tipos = new Set();
+
+        calendario.semanas.forEach(semana => {
+            semana.forEach(dia => {
+                dia.sesiones.forEach(sesion => {
+                    const { type } = getSessionTypeAndColor(sesion);
+                    tipos.add(type);
+                });
+
+                dia.eventos.forEach(evento => {
+                    const { type } = getEventTypeAndColor(evento);
+                    tipos.add(type);
+                });
+            });
+        });
+
+        return Array.from(tipos);
+    };
+
+    const renderCalendarioMes = (mesOffset: number) => {
+        const mesRender = mesActual + mesOffset;
+        const añoRender = añoActual;
+        let mesAjustado = mesRender;
+        let añoAjustado = añoRender;
+
+        if (mesRender > 12) {
+            mesAjustado = mesRender - 12;
+            añoAjustado = añoRender + 1;
+        } else if (mesRender < 1) {
+            mesAjustado = mesRender + 12;
+            añoAjustado = añoRender - 1;
+        }
+
+        const esMesActual = mesOffset === 0;
+
+        // Obtener el número de días del mes
+        const diasEnMes = new Date(añoAjustado, mesAjustado, 0).getDate();
+
+        // Obtener el día de la semana del primer día del mes (0 = domingo, 1 = lunes, etc.)
+        const primerDiaMes = new Date(añoAjustado, mesAjustado - 1, 1).getDay();
+        const ajustePrimerDia = primerDiaMes === 0 ? 6 : primerDiaMes - 1; // Ajustar para que lunes = 0
+
+        return (
+            <div className="flex flex-col gap-4">
+                <h3 className="text-center font-semibold text-gray-800 dark:text-gray-200 text-base">
+                    {meses[mesAjustado - 1]} {añoAjustado}
+                </h3>
+                <div className="grid grid-cols-7 text-center text-xs text-gray-500 dark:text-gray-400">
+                    {['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'].map((dia, i) => (
+                        <span key={i}>{dia}</span>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7 text-center text-sm">
+                    {/* Espacios vacíos antes del primer día del mes */}
+                    {Array.from({ length: ajustePrimerDia }, (_, i) => (
+                        <div key={`empty-${i}`} className="p-1"></div>
+                    ))}
+
+                    {/* Días del mes - MODIFICADO */}
+                    {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((dia) => {
+                        const hoy = new Date();
+                        const esHoy = esMesActual &&
+                            dia === hoy.getDate() &&
+                            mesAjustado === hoy.getMonth() + 1 &&
+                            añoAjustado === hoy.getFullYear();
+
+                        let tieneSesiones = false;
+                        let sesionesDelDia: any[] = [];
+
+                        if (calendario && esMesActual) {
+                            calendario.semanas.forEach(semana => {
+                                semana.forEach(diaCalendario => {
+                                    if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
+                                        tieneSesiones = diaCalendario.sesiones.length > 0;
+                                        sesionesDelDia = diaCalendario.sesiones;
+                                    }
+                                });
+                            });
+                        }
+
+                        const esDiaSeleccionado = esMesActual && dia === diaSeleccionado;
+
+                        // Obtener los colores de las sesiones del día
+                        const coloresSesiones = sesionesDelDia.map(sesion => {
+                            const { color } = getSessionTypeAndColor(sesion);
+                            return color;
+                        });
+
+                        // Eliminar colores duplicados
+                        const coloresUnicos = [...new Set(coloresSesiones)];
+
+                        return (
+                            <div key={dia} className="font-medium text-gray-800 dark:text-gray-200 relative">
+                                {tieneSesiones ? (
+                                    <button
+                                        onClick={() => handleDiaClick(dia)}
+                                        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-colors ${esDiaSeleccionado
+                                            ? 'bg-primary text-white ring-2 ring-primary ring-offset-2 dark:ring-offset-gray-800'
+                                            : coloresUnicos.length > 0
+                                                ? ''
+                                                : 'bg-primary/20 text-primary-dark dark:text-white dark:bg-primary/40'
+                                            }`}
+                                        style={{
+                                            backgroundColor: coloresUnicos.length > 0 ? coloresUnicos[0] : undefined
+                                        }}
+                                        title={`Ver sesiones del día ${dia}`}
+                                    >
+                                        {dia}
+                                        {coloresUnicos.length > 1 && (
+                                            <div className="absolute top-6 left-1/2 transform -translate-x-1/2 flex gap-1">
+                                                {coloresUnicos.slice(0, 3).map((color, index) => (
+                                                    <div
+                                                        key={index}
+                                                        className="w-1.5 h-1.5 rounded-full"
+                                                        style={{ backgroundColor: color }}
+                                                    ></div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <span className={`p-1 ${esHoy ? 'text-primary font-bold' : ''}`}>
+                                        {dia}
+                                    </span>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    };
+
+    const cargarDetalleParticipante = async (participanteId: string) => {
+        try {
+            const detalle = await notificacionesService.getColaboradorDetalle(participanteId);
+            if (detalle && participanteSeleccionado) {
+                // Actualizar el participante seleccionado con información más detallada
+                setParticipanteSeleccionado({
+                    ...participanteSeleccionado,
+                    ...detalle,
+                });
+            }
+        } catch (err) {
+            console.error('Error al cargar detalle del participante:', err);
+        }
+    };
+
+    const handleSeleccionarParticipante = (participante: ParticipanteSesion) => {
+        setParticipanteSeleccionado(participante);
+        // Cargar información adicional del participante
+        cargarDetalleParticipante(participante.id);
+    };
+
+    const enviarCorreoPrueba = async () => {
+        try {
+            await notificacionesService.enviarCorreoPrueba('test@example.com');
+            alert('Correo de prueba enviado exitosamente');
+        } catch (err: any) {
+            alert(`Error al enviar correo de prueba: ${err.message}`);
+            console.error('Error al enviar correo de prueba:', err);
+        }
+    };
+
+    const notificarParticipantes = async () => {
+        try {
+            await notificacionesService.notificarParticipantesSesion(sesionSeleccionada || 'sesion-1');
+            alert('Notificaciones enviadas a los participantes exitosamente');
+            // Recargar notificaciones
+            cargarNotificaciones();
+        } catch (err: any) {
+            alert(`Error al notificar participantes: ${err.message}`);
+            console.error('Error al notificar participantes:', err);
+        }
+    };
+
+    const getColorPorLugar = (lugar?: string) => {
+        switch (lugar) {
+            case 'capitulo_frontend': return '#00448D'; // Azul
+            case 'capitulo_backend': return '#FF6B35'; // Naranja
+            case 'capitulo_data': return '#FFD100'; // Amarillo
+            case 'journey_to_cloud': return '#E31937'; // Rojo
+            default: return '#9E9E9E'; // Gris
+        }
+    };
+
+    const getNombreSesion = (lugar?: string) => {
+        switch (lugar) {
+            case 'capitulo_frontend': return 'Frontend Masters';
+            case 'capitulo_backend': return 'Backend Devs';
+            case 'capitulo_data': return 'Capítulo Data';
+            case 'journey_to_cloud': return 'Journey to Cloud';
+            default: return 'General';
+        }
+    };
+
+    const getEstadoColor = (estado?: string) => {
+        switch (estado) {
+            case 'completado': return 'badge-success';
+            case 'en_progreso': return 'badge-info';
+            case 'pendiente': return 'badge-warning';
+            default: return 'badge-warning';
+        }
+    };
+
+    // Calcular estadísticas de notificaciones
+    const calcularEstadisticas = () => {
+        const total = notificaciones.length;
+        const enviadas = notificaciones.filter(n => n.estado === 'enviada').length;
+        const pendientes = notificaciones.filter(n => n.estado === 'pendiente').length;
+        const fallidas = notificaciones.filter(n => n.estado === 'fallida').length;
+
+        return { total, enviadas, pendientes, fallidas };
+    };
+
+    if (loading) {
+        return (
+            <div className="flex justify-center items-center min-h-screen">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    const estadisticas = calcularEstadisticas();
+    const tiposEnCalendario = getTiposEnCalendario();
+
+    // Título dinámico para la tarjeta de participantes
+    let tituloParticipantes = `Participantes de sesiones - ${meses[mesActual - 1]} ${añoActual}`;
+    if (diaSeleccionado) {
+        tituloParticipantes = `Participantes del ${diaSeleccionado} de ${meses[mesActual - 1]} - ${participantes.length} encontrados`;
+    } else if (participantes.length > 0 && !diaSeleccionado) {
+        tituloParticipantes = `Todos los participantes del mes - ${participantes.length} encontrados`;
+    }
+
+    return (
+        <div className="space-y-8">
+            {/* Header */}
+            <div className="flex flex-col gap-2">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                    Alertas de Correo
+                </h1>
+                <p className="text-gray-500 dark:text-gray-400 text-base">
+                    Calendario de sesiones de onboarding y gestión de notificaciones.
+                </p>
+            </div>
+
+            {error && (
+                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+                    <p className="text-red-600 dark:text-red-400">{error}</p>
+                    <button
+                        onClick={cargarCalendario}
+                        className="mt-2 text-sm text-red-700 dark:text-red-300 underline"
+                    >
+                        Reintentar
+                    </button>
+                </div>
+            )}
+
+            {/* Calendario de Sesiones */}
+            <Card title="Calendario de Sesiones">
+                <div className="flex items-center justify-between mb-6">
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleAnteriorMes}
+                        >
+                            <span className="material-symbols-outlined">chevron_left</span>
+                        </Button>
+                        <span className="text-gray-700 dark:text-gray-200 text-sm font-medium">
+                            {meses[mesActual - 1]} - {meses[mesActual % 12]} {añoActual}
+                        </span>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleSiguienteMes}
+                        >
+                            <span className="material-symbols-outlined">chevron_right</span>
+                        </Button>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    {/* Mes anterior */}
+                    {renderCalendarioMes(-1)}
+
+                    {/* Mes actual */}
+                    {renderCalendarioMes(0)}
+
+                    {/* Mes siguiente */}
+                    {renderCalendarioMes(1)}
+                </div>
+
+                {/* Leyenda actualizada */}
+                <div className="flex justify-center mt-4 flex-wrap gap-4 text-xs">
+                    {tiposEnCalendario.length > 0 ? (
+                        tiposEnCalendario.map((tipo: any, index) => {
+                            // Find the color for this type
+                            let color = '#9E9E9E'; // Default gray
+
+                            if (tipo === 'Capítulo Frontend') color = '#00448D';
+                            else if (tipo === 'Capítulo Backend') color = '#FF6B35';
+                            else if (tipo === 'Capítulo Data') color = '#FFD100';
+                            else if (tipo === 'Journey to Cloud') color = '#E31937';
+                            else if (tipo === 'Bienvenida') color = '#4CAF50';
+                            else if (tipo === 'Otro') color = '#9E9E9E';
+
+                            return (
+                                <div key={index} className="flex items-center gap-1">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
+                                    <span>{tipo}</span>
+                                </div>
+                            );
+                        })
+                    ) : (
+                        // Default legend if no events/sessions
+                        <>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#00448D' }}></div>
+                                <span>Capítulo Frontend</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FF6B35' }}></div>
+                                <span>Capítulo Backend</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#FFD100' }}></div>
+                                <span>Capítulo Data</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#E31937' }}></div>
+                                <span>Journey to Cloud</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#4CAF50' }}></div>
+                                <span>Bienvenida</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#9E9E9E' }}></div>
+                                <span>Otro</span>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </Card>
+
+            {/* Participantes y Detalles */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+                {/* Lista de Participantes - MODIFICADO */}
+                <div className="lg:col-span-2">
+                    <Card
+                        title={tituloParticipantes}
+                        subtitle={diaSeleccionado || participantes.length > 0 ? `Haz clic en un participante para ver sus detalles.` : 'Haz clic en un día del calendario con sesiones para ver los participantes.'}
+                        actions={
+                            <Button variant="outline" onClick={handleMostrarTodosParticipantesMes} disabled={loadingTodosParticipantes}>
+                                {loadingTodosParticipantes ? (
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-current"></div>
+                                ) : (
+                                    <span className="material-symbols-outlined">groups</span>
+                                )}
+                                Mostrar participantes del mes
+                            </Button>
+                        }
+                    >
+                        {/* Búsqueda */}
+                        <div className="mb-6">
+                            <div className="relative">
+                                <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                                    search
+                                </span>
+                                <Input
+                                    placeholder="Buscar participante por nombre, email, departamento..."
+                                    value={busqueda}
+                                    onChange={(e) => setBusqueda(e.target.value)}
+                                    className="pl-10"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Tabla de Participantes */}
+                        <div className="overflow-x-auto">
+                            {participantesFiltrados.length > 0 ? (
+                                <table className="w-full text-left">
+                                    <thead className="text-xs text-gray-500 dark:text-gray-400 uppercase bg-gray-50 dark:bg-gray-700/50">
+                                        <tr>
+                                            <th className="px-6 py-3 font-medium">Nombre</th>
+                                            <th className="px-6 py-3 font-medium">Email</th>
+                                            <th className="px-6 py-3 font-medium">Departamento</th>
+                                            <th className="px-6 py-3 font-medium">Sesión</th>
+                                            <th className="px-6 py-3 font-medium">Estado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {participantesFiltrados.map((participante) => (
+                                            <tr
+                                                key={participante.id}
+                                                onClick={() => handleSeleccionarParticipante(participante)}
+                                                className={`
+                          cursor-pointer border-b dark:border-gray-700 
+                          ${participanteSeleccionado?.id === participante.id
+                                                        ? 'bg-primary/10 dark:bg-primary/20 hover:bg-primary/20 dark:hover:bg-primary/30'
+                                                        : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
+                                                    }
+                        `}
+                                            >
+                                                <td className="px-6 py-4">
+                                                    <div className="text-sm font-medium text-gray-900 dark:text-white">
+                                                        {participante.nombreCompleto}
+                                                    </div>
+                                                    {participante.puesto && (
+                                                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {participante.puesto}
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                    {participante.email}
+                                                </td>
+                                                <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                    {participante.departamento || 'No especificado'}
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="w-3 h-3 rounded-full"
+                                                            style={{ backgroundColor: getColorPorLugar(participante.lugarAsignacion) }}
+                                                        />
+                                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                                            {getNombreSesion(participante.lugarAsignacion)}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`badge ${getEstadoColor(participante.estadoTecnico)}`}>
+                                                        {participante.estadoTecnico || 'pendiente'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            ) : (
+                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                    <span className="material-symbols-outlined text-4xl mb-2">event_available</span>
+                                    <p>No hay participantes seleccionados.</p>
+                                    <p className="text-sm">Selecciona un día en el calendario o muestra todos los del mes.</p>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                </div>
+
+                {/* Detalles del Participante */}
+                <div className="lg:col-span-1">
+                    <Card
+                        title="Detalles del Participante"
+                        className="sticky top-8"
+                    >
+                        {participanteSeleccionado ? (
+                            <div className="space-y-6">
+                                {/* Información del participante */}
+                                <div className="flex items-center gap-4">
+                                    <div
+                                        className="rounded-full w-16 h-16 flex items-center justify-center text-white text-2xl font-bold"
+                                        style={{ backgroundColor: getColorPorLugar(participanteSeleccionado.lugarAsignacion) }}
+                                    >
+                                        {participanteSeleccionado.nombreCompleto?.charAt(0) || 'U'}
+                                    </div>
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                            {participanteSeleccionado.nombreCompleto}
+                                        </h3>
+                                        <p className="text-gray-500 dark:text-gray-400">
+                                            {participanteSeleccionado.puesto || 'Sin puesto asignado'}
+                                        </p>
+                                        <div className="flex items-center gap-2 mt-1">
+                                            <span className={`badge ${getEstadoColor(participanteSeleccionado.estadoTecnico)}`}>
+                                                {participanteSeleccionado.estadoTecnico || 'pendiente'}
+                                            </span>
+                                            {participanteSeleccionado.lugarAsignacion && (
+                                                <span className="text-xs px-2 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300">
+                                                    {getNombreSesion(participanteSeleccionado.lugarAsignacion)}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Información detallada */}
+                                <div className="space-y-4">
+                                    {/* Correo Electrónico en una fila completa para evitar solapamientos */}
+                                    <div>
+                                        <label className="text-xs text-gray-500 dark:text-gray-400">
+                                            Correo Electrónico
+                                        </label>
+                                        <p className="text-sm text-gray-800 dark:text-gray-200 break-all">
+                                            {participanteSeleccionado.email}
+                                        </p>
+                                    </div>
+
+                                    {/* Teléfono también en una fila completa para una mejor legibilidad */}
+                                    <div>
+                                        <label className="text-xs text-gray-500 dark:text-gray-400">
+                                            Teléfono
+                                        </label>
+                                        <p className="text-sm text-gray-800 dark:text-gray-200">
+                                            {participanteSeleccionado.telefono || 'No disponible'}
+                                        </p>
+                                    </div>
+
+                                    {/* El resto de la información en una cuadrícula de 2 columnas para optimizar el espacio */}
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                            <label className="text-xs text-gray-500 dark:text-gray-400">
+                                                Departamento
+                                            </label>
+                                            <p className="text-sm text-gray-800 dark:text-gray-200">
+                                                {participanteSeleccionado.departamento || 'No especificado'}
+                                            </p>
+                                        </div>
+                                        <div>
+                                            <label className="text-xs text-gray-500 dark:text-gray-400">
+                                                Fecha de Ingreso
+                                            </label>
+                                            <p className="text-sm text-gray-800 dark:text-gray-200">
+                                                {participanteSeleccionado.fechaIngreso
+                                                    ? new Date(participanteSeleccionado.fechaIngreso).toLocaleDateString('es-ES')
+                                                    : 'No disponible'
+                                                }
+                                            </p>
+                                        </div>
+                                        {participanteSeleccionado.fechaOnboardingTecnico && (
+                                            <div>
+                                                <label className="text-xs text-gray-500 dark:text-gray-400">
+                                                    Fecha Onboarding Técnico
+                                                </label>
+                                                <p className="text-sm text-gray-800 dark:text-gray-200">
+                                                    {new Date(participanteSeleccionado.fechaOnboardingTecnico).toLocaleDateString('es-ES')}
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* Sesión Asignada */}
+                                <div>
+                                    <label className="text-xs text-gray-500 dark:text-gray-400">
+                                        Sesión Asignada
+                                    </label>
+                                    <p className="text-sm text-gray-800 dark:text-gray-200">
+                                        {participanteSeleccionado.lugarAsignacion || 'No asignada'}
+                                    </p>
+                                </div>
+
+                                {/* Progreso del Onboarding */}
+                                <div>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <label className="text-xs text-gray-500 dark:text-gray-400">
+                                            Progreso del Onboarding
+                                        </label>
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {participanteSeleccionado.estadoTecnico === 'completado' ? '100%' :
+                                                participanteSeleccionado.estadoTecnico === 'en_progreso' ? '50%' : '0%'}
+                                        </span>
+                                    </div>
+                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                        <div
+                                            className="bg-yellow-500 h-2.5 rounded-full"
+                                            style={{
+                                                width: participanteSeleccionado.estadoTecnico === 'completado' ? '100%' :
+                                                    participanteSeleccionado.estadoTecnico === 'en_progreso' ? '50%' : '0%'
+                                            }}
+                                        ></div>
+                                    </div>
+                                    <p className="text-xs text-right text-gray-500 dark:text-gray-400 mt-1">
+                                        {participanteSeleccionado.estadoTecnico === 'completado' ? 'Completado' :
+                                            participanteSeleccionado.estadoTecnico === 'en_progreso' ? 'En progreso' : 'Pendiente'}
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                <span className="material-symbols-outlined text-4xl mb-2">person_search</span>
+                                <p>Selecciona un participante para ver sus detalles</p>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            </div>
+
+            {/* Probar Notificaciones */}
+            <Card
+                title="Probar Notificaciones"
+                subtitle="Verifica la entrega de alertas por correo."
+                actions={
+                    <Button variant="outline" onClick={enviarCorreoPrueba}>
+                        <span className="material-symbols-outlined">send</span>
+                        Enviar Correo de Prueba
+                    </Button>
+                }
+            >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
+                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                            Notificar Participantes
+                        </h4>
+                        <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
+                            Envía notificaciones a todos los participantes de la sesión.
+                        </p>
+                        <Button variant="primary" onClick={notificarParticipantes}>
+                            <span className="material-symbols-outlined">notifications</span>
+                            Notificar Todos
+                        </Button>
+                    </div>
+                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                        <h4 className="font-medium text-green-800 dark:text-green-300 mb-2">
+                            Estadísticas de Envío
+                        </h4>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.total}</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">Total Notificaciones</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.enviadas}</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">Enviadas</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{estadisticas.pendientes}</p>
+                                <p className="text-sm text-yellow-600 dark:text-yellow-500">Pendientes</p>
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-red-700 dark:text-red-400">{estadisticas.fallidas}</p>
+                                <p className="text-sm text-red-600 dark:text-red-500">Fallidas</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </Card>
+        </div>
+    );
+};
+
+export default AlertasCorreo;
