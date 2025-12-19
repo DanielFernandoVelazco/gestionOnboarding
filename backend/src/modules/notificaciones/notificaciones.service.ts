@@ -186,20 +186,27 @@ export class NotificacionesService {
                 estado: EstadoSesion.PROGRAMADA,
                 activo: true,
             },
-
             relations: ['participantes', 'tipo'],
         });
 
         const notificaciones: Notificacion[] = [];
 
         for (const sesion of sesiones) {
+            // Extraer hora de la fecha de inicio
+            const horaInicio = sesion.fechaInicio.toLocaleTimeString('es-ES', {
+                hour: '2-digit',
+                minute: '2-digit',
+            });
+
             for (const participante of sesion.participantes) {
                 const contenido = this.mailService.generateReminderTemplate({
                     colaboradorNombre: participante.nombreCompleto,
                     sesionTitulo: sesion.titulo,
                     fechaInicio: sesion.fechaInicio.toLocaleDateString('es-ES'),
+                    horaInicio: horaInicio, // Agregar hora de inicio
                     tiempoRestante: '24 horas',
                     enlaceVirtual: sesion.enlaceVirtual,
+                    ubicacion: sesion.ubicacion, // También agregar ubicación si existe
                 });
 
                 const notificacion = await this.createNotificacion({
@@ -211,6 +218,7 @@ export class NotificacionesService {
                     metadata: {
                         sesionTitulo: sesion.titulo,
                         fechaInicio: sesion.fechaInicio,
+                        horaInicio: horaInicio,
                     },
                     creadoPor: { id: 'system' } as User, // Usuario sistema
                 });
