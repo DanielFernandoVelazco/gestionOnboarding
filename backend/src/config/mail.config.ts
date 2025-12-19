@@ -1,12 +1,8 @@
 import { registerAs } from '@nestjs/config';
 
 export default registerAs('mail', () => ({
-    host: process.env.MAIL_HOST,
-    port: parseInt(process.env.MAIL_PORT || '2525', 10),
-    secure: false,
-    auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS,
-    }
-
+    enabled: process.env.MAIL_ENABLED === 'true',
+    token: process.env.MAILTRAP_TOKEN,
+    fromEmail: process.env.MAIL_FROM_EMAIL || 'hello@demomailtrap.co',
+    fromName: process.env.MAIL_FROM_NAME || 'Sistema de Onboarding',
 }));
