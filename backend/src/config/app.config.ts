@@ -5,7 +5,7 @@ export default registerAs('app', () => ({
     name: process.env.APP_NAME,
     version: process.env.APP_VERSION,
     port: parseInt(process.env.PORT || '3001', 10),
-    apiPrefix: process.env.API_PREFIX,
+    apiPrefix: process.env.API_PREFIX || 'api',
     frontendUrl: process.env.FRONTEND_URL,
     corsOrigin: process.env.CORS_ORIGIN,
 }));
