@@ -1,4 +1,6 @@
 import React from 'react';
+import { format, getDay, startOfMonth, endOfMonth, isSameDay } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface CalendarioMiniProps {
     año: number;
@@ -19,16 +21,20 @@ const CalendarioMini: React.FC<CalendarioMiniProps> = ({ año, mes, eventos, onD
 
     const diasSemana = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá', 'Do'];
 
-    // Obtener primer día del mes
-    const primerDia = new Date(año, mes - 1, 1);
-    const primerDiaSemana = primerDia.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+    // Obtener primer día del mes usando date-fns
+    const primerDia = startOfMonth(new Date(año, mes - 1, 1));
+
+    // Obtener día de la semana del primer día del mes usando date-fns
+    const primerDiaSemana = getDay(primerDia);
 
     // Ajustar para que Lunes sea el primer día (1)
     const primerDiaAjustado = primerDiaSemana === 0 ? 6 : primerDiaSemana - 1;
 
-    // Obtener último día del mes
-    const ultimoDia = new Date(año, mes, 0);
-    const totalDias = ultimoDia.getDate();
+    // Obtener último día del mes usando date-fns
+    const ultimoDia = endOfMonth(primerDia);
+
+    // Obtener número de días del mes usando date-fns
+    const totalDias = parseInt(format(ultimoDia, 'd'));
 
     // Generar array de días
     const dias = [];
@@ -46,6 +52,16 @@ const CalendarioMini: React.FC<CalendarioMiniProps> = ({ año, mes, eventos, onD
     const getEventoDelDia = (dia: number | null) => {
         if (!dia) return null;
         return eventos.find(evento => evento.dia === dia);
+    };
+
+    // Obtener fecha actual usando date-fns
+    const hoy = new Date();
+
+    // CORRECCIÓN: Cambiar la firma de la función para aceptar `number | null`
+    const esHoy = (dia: number | null) => {
+        if (!dia) return false;
+        const fechaDia = new Date(año, mes - 1, dia);
+        return isSameDay(fechaDia, hoy);
     };
 
     return (
@@ -67,9 +83,7 @@ const CalendarioMini: React.FC<CalendarioMiniProps> = ({ año, mes, eventos, onD
             <div className="grid grid-cols-7 gap-1">
                 {dias.map((dia, i) => {
                     const evento = getEventoDelDia(dia);
-                    const esHoy = dia === new Date().getDate() &&
-                        mes === new Date().getMonth() + 1 &&
-                        año === new Date().getFullYear();
+                    const esDiaActual = esHoy(dia);
 
                     return (
                         <div
@@ -78,7 +92,7 @@ const CalendarioMini: React.FC<CalendarioMiniProps> = ({ año, mes, eventos, onD
                             className={`
                 aspect-square flex items-center justify-center text-sm
                 ${dia ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700' : ''}
-                ${esHoy ? 'bg-primary/10 text-primary dark:text-primary font-bold' : ''}
+                ${esDiaActual ? 'bg-primary/10 text-primary dark:text-primary font-bold' : ''}
                 rounded relative
               `}
                         >
