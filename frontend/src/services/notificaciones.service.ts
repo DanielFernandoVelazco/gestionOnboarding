@@ -1,4 +1,6 @@
 import api from '../api/axios.config';
+import { format, parse, startOfMonth, endOfMonth, getDay, addDays, startOfWeek, endOfWeek, isSameDay, isWithinInterval } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 // Interfaces del calendario
 export interface EventoCalendario {
@@ -125,15 +127,15 @@ export const notificacionesService = {
     // Calendario - Obtener eventos del mes
     getCalendarioMes: async (año: number, mes: number): Promise<MesCalendario> => {
         try {
-            // Obtener eventos del calendario
-            const fechaDesde = new Date(año, mes - 1, 1);
-            const fechaHasta = new Date(año, mes, 0);
+            // Obtener eventos del calendario usando date-fns
+            const fechaDesde = startOfMonth(new Date(año, mes - 1, 1));
+            const fechaHasta = endOfMonth(fechaDesde);
 
             const [eventosResponse, sesionesResponse] = await Promise.all([
                 api.get('/calendario/eventos', {
                     params: {
-                        fechaDesde: fechaDesde.toISOString().split('T')[0],
-                        fechaHasta: fechaHasta.toISOString().split('T')[0],
+                        fechaDesde: format(fechaDesde, 'yyyy-MM-dd'),
+                        fechaHasta: format(fechaHasta, 'yyyy-MM-dd'),
                     },
                 }),
                 api.get('/onboarding/sesiones/mes/' + año + '/' + mes),
@@ -160,10 +162,15 @@ export const notificacionesService = {
         } catch (error) {
             console.error('Error al cargar calendario:', error);
             // Retornar calendario vacío en caso de error
+            const nombresMeses = [
+                'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+                'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+            ];
+
             return {
                 año,
                 mes,
-                nombreMes: new Date(año, mes - 1, 1).toLocaleDateString('es-ES', { month: 'long' }),
+                nombreMes: nombresMeses[mes - 1],
                 semanas: [],
             };
         }
@@ -316,27 +323,20 @@ export const notificacionesService = {
     },
 };
 
-// Función auxiliar para generar semanas
+// Función auxiliar para generar semanas usando date-fns
 function generarSemanas(
     año: number,
     mes: number,
     eventos: EventoCalendario[],
     sesiones: SesionCalendario[],
 ): DiaCalendario[][] {
-    const primerDia = new Date(año, mes, 1);
-    const ultimoDia = new Date(año, mes + 1, 0);
+    // Usar date-fns para obtener el primer y último día del mes
+    const primerDiaMes = startOfMonth(new Date(año, mes, 1));
+    const ultimoDiaMes = endOfMonth(primerDiaMes);
 
-    // Ajustar primer día a lunes
-    const primerDiaSemana = new Date(primerDia);
-    const diaSemana = primerDia.getDay();
-    primerDiaSemana.setDate(primerDia.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1));
-
-    // Ajustar último día a domingo
-    const ultimoDiaSemana = new Date(ultimoDia);
-    const diaSemanaUltimo = ultimoDia.getDay();
-    if (diaSemanaUltimo !== 0) {
-        ultimoDiaSemana.setDate(ultimoDia.getDate() + (7 - diaSemanaUltimo));
-    }
+    // Ajustar al inicio de la semana (lunes) y fin de la semana (domingo)
+    const primerDiaSemana = startOfWeek(primerDiaMes, { weekStartsOn: 1 });
+    const ultimoDiaSemana = endOfWeek(ultimoDiaMes, { weekStartsOn: 1 });
 
     const semanas: DiaCalendario[][] = [];
     let fechaActual = new Date(primerDiaSemana);
@@ -348,20 +348,16 @@ function generarSemanas(
             const fecha = new Date(fechaActual);
             const esMesActual = fecha.getMonth() === mes;
 
-            // Filtrar eventos para este día
+            // Filtrar eventos para este día usando date-fns
             const eventosDia = eventos.filter(evento => {
-                const eventoFecha = new Date(evento.fechaInicio);
-                return eventoFecha.getDate() === fecha.getDate() &&
-                    eventoFecha.getMonth() === fecha.getMonth() &&
-                    eventoFecha.getFullYear() === fecha.getFullYear();
+                const eventoFecha = parse(evento.fechaInicio, 'yyyy-MM-dd', new Date());
+                return isSameDay(eventoFecha, fecha);
             });
 
-            // Filtrar sesiones para este día
+            // Filtrar sesiones para este día usando date-fns
             const sesionesDia = sesiones.filter(sesion => {
-                const sesionFecha = new Date(sesion.fechaInicio);
-                return sesionFecha.getDate() === fecha.getDate() &&
-                    sesionFecha.getMonth() === fecha.getMonth() &&
-                    sesionFecha.getFullYear() === fecha.getFullYear();
+                const sesionFecha = parse(sesion.fechaInicio, 'yyyy-MM-dd', new Date());
+                return isSameDay(sesionFecha, fecha);
             });
 
             semana.push({
@@ -371,7 +367,8 @@ function generarSemanas(
                 sesiones: sesionesDia,
             });
 
-            fechaActual.setDate(fechaActual.getDate() + 1);
+            // Usar date-fns para avanzar al siguiente día
+            fechaActual = addDays(fechaActual, 1);
         }
 
         semanas.push(semana);
