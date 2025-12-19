@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { format, parse, differenceInDays, isSameDay, startOfDay, getDay, startOfMonth, endOfMonth, eachDayOfInterval, getMonth, getYear } from 'date-fns';
+import { es } from 'date-fns/locale';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
 import { notificacionesService, ParticipanteSesion, MesCalendario, Notificacion } from '../../../services/notificaciones.service';
 
 const AlertasCorreo = () => {
-    const [mesActual, setMesActual] = useState(new Date().getMonth() + 1);
-    const [añoActual, setAñoActual] = useState(new Date().getFullYear());
+    const [mesActual, setMesActual] = useState(getMonth(new Date()) + 1);
+    const [añoActual, setAñoActual] = useState(getYear(new Date()));
     const [calendario, setCalendario] = useState<MesCalendario | null>(null);
     const [participantes, setParticipantes] = useState<ParticipanteSesion[]>([]);
     const [participanteSeleccionado, setParticipanteSeleccionado] = useState<ParticipanteSesion | null>(null);
@@ -202,21 +204,6 @@ const AlertasCorreo = () => {
         p.puesto?.toLowerCase().includes(busqueda.toLowerCase())
     );
 
-    const getDiasDestacados = () => {
-        if (!calendario) return [];
-
-        const diasDestacados: number[] = [];
-        calendario.semanas.forEach(semana => {
-            semana.forEach(dia => {
-                if (dia.esMesActual && (dia.eventos.length > 0 || dia.sesiones.length > 0)) {
-                    diasDestacados.push(dia.fecha.getDate());
-                }
-            });
-        });
-
-        return diasDestacados;
-    };
-
     // Function to get session type and color
     const getSessionTypeAndColor = (sesion: any) => {
         if (!sesion) return { type: 'Otro', color: '#9E9E9E' };
@@ -288,15 +275,18 @@ const AlertasCorreo = () => {
             añoAjustado = añoRender - 1;
         }
 
-        const diasDestacados = getDiasDestacados();
         const esMesActual = mesOffset === 0;
 
-        // Obtener el número de días del mes
-        const diasEnMes = new Date(añoAjustado, mesAjustado, 0).getDate();
+        // Crear una fecha para el primer día del mes usando date-fns
+        const primerDiaMes = new Date(añoAjustado, mesAjustado - 1, 1);
+        const ultimoDiaMes = endOfMonth(primerDiaMes);
 
-        // Obtener el día de la semana del primer día del mes (0 = domingo, 1 = lunes, etc.)
-        const primerDiaMes = new Date(añoAjustado, mesAjustado - 1, 1).getDay();
-        const ajustePrimerDia = primerDiaMes === 0 ? 6 : primerDiaMes - 1; // Ajustar para que lunes = 0
+        // Obtener el número de días del mes usando date-fns
+        const diasEnMes = parseInt(format(ultimoDiaMes, 'd'));
+
+        // Obtener el día de la semana del primer día del mes usando date-fns
+        const diaSemanaPrimerDia = getDay(primerDiaMes);
+        const ajustePrimerDia = diaSemanaPrimerDia === 0 ? 6 : diaSemanaPrimerDia - 1; // Ajustar para que lunes = 0
 
         return (
             <div className="flex flex-col gap-4">
@@ -316,7 +306,6 @@ const AlertasCorreo = () => {
 
                     {/* Días del mes - MODIFICADO */}
                     {Array.from({ length: diasEnMes }, (_, i) => i + 1).map((dia) => {
-                        const esDestacado = esMesActual && diasDestacados.includes(dia);
                         const hoy = new Date();
                         const esHoy = esMesActual &&
                             dia === hoy.getDate() &&
@@ -409,22 +398,6 @@ const AlertasCorreo = () => {
         setParticipanteSeleccionado(participante);
         // Cargar información adicional del participante
         cargarDetalleParticipante(participante.id);
-    };
-
-    const eliminarParticipante = async (id: string) => {
-        if (window.confirm('¿Estás seguro de eliminar este participante de la sesión?')) {
-            try {
-                await notificacionesService.eliminarParticipanteSesion(sesionSeleccionada || 'sesion-1', id);
-                // Actualizar la lista localmente
-                setParticipantes(participantes.filter(p => p.id !== id));
-                if (participanteSeleccionado?.id === id) {
-                    setParticipanteSeleccionado(participantesFiltrados[0] || null);
-                }
-            } catch (err: any) {
-                alert(`Error al eliminar participante: ${err.message}`);
-                console.error('Error al eliminar participante:', err);
-            }
-        }
     };
 
     const enviarCorreoPrueba = async () => {
@@ -799,7 +772,7 @@ const AlertasCorreo = () => {
                                             </label>
                                             <p className="text-sm text-gray-800 dark:text-gray-200">
                                                 {participanteSeleccionado.fechaIngreso
-                                                    ? new Date(participanteSeleccionado.fechaIngreso).toLocaleDateString('es-ES')
+                                                    ? format(parse(participanteSeleccionado.fechaIngreso, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy')
                                                     : 'No disponible'
                                                 }
                                             </p>
@@ -810,7 +783,7 @@ const AlertasCorreo = () => {
                                                     Fecha Onboarding Técnico
                                                 </label>
                                                 <p className="text-sm text-gray-800 dark:text-gray-200">
-                                                    {new Date(participanteSeleccionado.fechaOnboardingTecnico).toLocaleDateString('es-ES')}
+                                                    {format(parse(participanteSeleccionado.fechaOnboardingTecnico, 'yyyy-MM-dd', new Date()), 'dd/MM/yyyy')}
                                                 </p>
                                             </div>
                                         )}
