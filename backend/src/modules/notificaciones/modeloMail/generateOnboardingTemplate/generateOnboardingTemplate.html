@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sesión de Onboarding</title>
+    <style>
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>🎯 Sesión de Onboarding Programada</h1>
+            <p>Sistema de Gestión de Onboarding Técnico</p>
+        </div>
+
+        <div class="content">
+            <div class="greeting">Hola ${data.colaboradorNombre},</div>
+
+            <p>Te informamos que has sido agendado para una sesión de onboarding técnico. A continuación encontrarás
+                todos los detalles:</p>
+
+            <div class="info-card">
+                <h3>${data.sesionTitulo}</h3>
+
+                <div class="info-item">
+                    <div class="icon">📅</div>
+                    <div class="text">
+                        <strong>Fechas:</strong> ${data.fechaInicio} - ${data.fechaFin}
+                    </div>
+                </div>
+
+                <!-- UBICACION_BLOCK -->
+                <div class="info-item">
+                    <div class="icon">📍</div>
+                    <div class="text">
+                        <strong>Ubicación:</strong> ${data.ubicacion}
+                    </div>
+                </div>
+                <!-- /UBICACION_BLOCK -->
+
+                <!-- ENLACE_BLOCK -->
+                <div class="info-item">
+                    <div class="icon">🔗</div>
+                    <div class="text">
+                        <strong>Enlace virtual:</strong> ${data.enlaceVirtual}
+                    </div>
+                </div>
+                <!-- /ENLACE_BLOCK -->
+
+                <!-- INSTRUCTOR_BLOCK -->
+                <div class="info-item">
+                    <div class="icon">👨‍🏫</div>
+                    <div class="text">
+                        <strong>Instructor:</strong> ${data.instructor}
+                    </div>
+                </div>
+                <!-- /INSTRUCTOR_BLOCK -->
+            </div>
+
+            <!-- BOTON_BLOCK -->
+            <div style="text-align: center; margin: 25px 0;">
+                <a href="${data.enlaceVirtual}" class="button" style="color: white;">
+                    🚀 Acceder a la Sesión
+                </a>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                    El enlace estará activo 15 minutos antes del inicio
+                </p>
+            </div>
+            <!-- /BOTON_BLOCK -->
+
+            <!-- NOTAS_BLOCK -->
+            <div class="notes">
+                <h4>📝 Información Adicional</h4>
+                <p>${data.notas}</p>
+            </div>
+            <!-- /NOTAS_BLOCK -->
+
+            <div class="highlight">
+                <p><strong>💡 Preparación recomendada:</strong></p>
+                <ul style="margin: 10px 0 10px 20px;">
+                    <li>Laptop con batería cargada</li>
+                    <li>Conexión estable a internet</li>
+                    <li>Cuaderno o dispositivo para tomar notas</li>
+                    <li>Software necesario instalado previamente</li>
+                </ul>
+            </div>
+
+            <p style="margin-top: 25px;">Si tienes alguna duda o impedimento para asistir, por favor comunícate con el
+                administrador del sistema.</p>
+
+            <p style="margin-top: 20px; color: #00448D; font-weight: 600;">
+                ¡Te esperamos!
+            </p>
+        </div>
+
+        <div class="footer">
+            <p>Este es un mensaje automático generado por el Sistema de Gestión de Onboarding.</p>
+            <p>Por favor, no respondas a este correo.</p>
+            <p>© ${new Date().getFullYear()} Sistema de Gestión de Onboarding. Todos los derechos reservados.</p>
+        </div>
+    </div>
+</body>
+
+</html>
