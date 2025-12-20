@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <style>
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>✅ Correo de Prueba</h1>
+            <p>Sistema de Gestión de Onboarding</p>
+        </div>
+        <div class="content">
+            <h2>¡Hola!</h2>
+            <p>Este es un correo de prueba enviado desde el sistema de gestión de onboarding.</p>
+            <p><strong>Fecha y hora:</strong> ${new Date().toLocaleString('es-ES')}</p>
+            <p><strong>Sistema:</strong> Backend NestJS con Mailtrap</p>
+            <p>Si recibes este correo, significa que la configuración de notificaciones por correo está funcionando
+                correctamente.</p>
+            <p style="margin-top: 30px; padding: 15px; background: #e8f4fd; border-radius: 5px;">
+                <strong>📧 Información técnica:</strong><br>
+                • Servicio: Mailtrap API<br>
+                • Método: Nodemailer + Mailtrap Transport<br>
+                • Estado: ✅ Configuración exitosa
+            </p>
+        </div>
+        <div class="footer">
+            <p>Este es un mensaje automático. No respondas a este correo.</p>
+            <p>© ${new Date().getFullYear()} Sistema de Gestión de Onboarding</p>
+        </div>
+    </div>
+</body>
+
+</html>
