@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recordatorio de Sesión</title>
+    <style>
+    </style>
+</head>
+
+<body>
+    <div class="email-container">
+        <div class="header">
+            <h1>⏰ Recordatorio de Sesión</h1>
+            <p>Tu sesión de onboarding está por comenzar</p>
+            <div class="reminder-badge">RECORDATORIO</div>
+        </div>
+
+        <div class="content">
+            <div class="urgent-message">
+                <h3>${data.sesionTitulo}</h3>
+                <p>Tu sesión está programada para:</p>
+                <div class="countdown">${data.fechaInicio} a las ${data.horaInicio}</div>
+                <p><strong>Tiempo restante:</strong> ${data.tiempoRestante}</p>
+            </div>
+
+            <div style="margin: 25px 0; text-align: center;">
+                <!-- BOTON_UNIRSE_BLOCK -->
+                <a href="${data.enlaceVirtual}" class="button" style="color: white;">
+                    🚪 Unirse Ahora
+                </a>
+                <!-- /BOTON_UNIRSE_BLOCK -->
+
+                <!-- UBICACION_RECORDATORIO_BLOCK -->
+                <p><strong>📍 Ubicación:</strong> ${data.ubicacion}</p>
+                <!-- /UBICACION_RECORDATORIO_BLOCK -->
+            </div>
+
+            <p style="text-align: center; color: #666; font-size: 14px;">
+                Por favor, asegúrate de estar listo con tiempo suficiente.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>
