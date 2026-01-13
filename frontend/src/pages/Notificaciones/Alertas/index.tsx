@@ -879,7 +879,7 @@ const AlertasCorreo = () => {
                                         variant="primary"
                                         onClick={() => abrirModalSeleccionDestinatarios('prueba')}
                                         disabled={!participanteSeleccionado.email}
-                                        fullWidth
+                                        className="w-full"
                                     >
                                         <span className="material-symbols-outlined">send</span>
                                         Enviar correo de prueba
