@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { format, parse, getDay, getMonth, getYear, endOfMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
 import Card from '../../../components/ui/Card';
 import Button from '../../../components/ui/Button';
 import Input from '../../../components/ui/Input';
@@ -31,13 +30,6 @@ const AlertasCorreo = () => {
     const [mensajeExito, setMensajeExito] = useState<string | null>(null);
     const [mensajeError, setMensajeError] = useState<string | null>(null);
 
-    // NUEVO ESTADO PARA DETALLES DEL DÍA
-    const [detalleDia, setDetalleDia] = useState<{
-        dia: number;
-        sesiones: any[];
-        eventos: any[];
-    } | null>(null);
-
     // Nombres de meses en español
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -55,11 +47,9 @@ const AlertasCorreo = () => {
     const cargarCalendario = async () => {
         setLoading(true);
         setError(null);
-        // Limpiamos los estados relacionados con participantes al cambiar de mes
         setParticipantes([]);
         setParticipanteSeleccionado(null);
         setDiaSeleccionado(null);
-        setDetalleDia(null);
 
         try {
             const calendarioData = await notificacionesService.getCalendarioMes(añoActual, mesActual);
@@ -93,55 +83,37 @@ const AlertasCorreo = () => {
         if (!calendario) return;
 
         const sesionesDelDia: any[] = [];
-        const eventosDelDia: any[] = [];
 
-        // Buscar sesiones y eventos del día
         calendario.semanas.forEach(semana => {
             semana.forEach(diaCalendario => {
                 if (diaCalendario.esMesActual && diaCalendario.fecha.getDate() === dia) {
                     sesionesDelDia.push(...diaCalendario.sesiones);
-                    eventosDelDia.push(...diaCalendario.eventos);
                 }
             });
-        });
-
-        // Guardar detalles del día para mostrar
-        setDetalleDia({
-            dia,
-            sesiones: sesionesDelDia,
-            eventos: eventosDelDia
         });
 
         if (sesionesDelDia.length > 0) {
             setDiaSeleccionado(dia);
 
-            // Si solo hay una sesión, cargar participantes automáticamente
             if (sesionesDelDia.length === 1) {
                 cargarParticipantesPorSesion(sesionesDelDia[0].id);
             } else if (sesionesDelDia.length > 1) {
-                // Mostrar modal para seleccionar sesión
-                mostrarModalSeleccionSesion(sesionesDelDia, dia);
+                const opciones = sesionesDelDia.map((s, i) => `${i + 1}. ${s.titulo}`).join('\n');
+                const seleccion = window.prompt(
+                    `Hay ${sesionesDelDia.length} sesiones el día ${dia}.\n\nSelecciona una:\n\n${opciones}`
+                );
+
+                if (seleccion) {
+                    const indice = parseInt(seleccion) - 1;
+                    if (indice >= 0 && indice < sesionesDelDia.length) {
+                        cargarParticipantesPorSesion(sesionesDelDia[indice].id);
+                    }
+                }
             }
         } else {
-            // Si no hay sesiones, mostrar solo eventos del día
             setDiaSeleccionado(dia);
             setParticipantes([]);
             setParticipanteSeleccionado(null);
-        }
-    };
-
-    // NUEVA FUNCIÓN: Mostrar modal para seleccionar sesión
-    const mostrarModalSeleccionSesion = (sesiones: any[], dia: number) => {
-        const opciones = sesiones.map((s, i) => `${i + 1}. ${s.titulo} (${getSessionTypeAndColor(s).type})`).join('\n');
-        const seleccion = window.prompt(
-            `Hay ${sesiones.length} sesiones el día ${dia}.\n\nSelecciona una:\n\n${opciones}`
-        );
-
-        if (seleccion) {
-            const indice = parseInt(seleccion) - 1;
-            if (indice >= 0 && indice < sesiones.length) {
-                cargarParticipantesPorSesion(sesiones[indice].id);
-            }
         }
     };
 
@@ -155,7 +127,6 @@ const AlertasCorreo = () => {
         setParticipantes([]);
         setParticipanteSeleccionado(null);
         setDiaSeleccionado(null);
-        setDetalleDia(null);
 
         try {
             const sesionesIds = new Set<string>();
@@ -233,7 +204,6 @@ const AlertasCorreo = () => {
         p.puesto?.toLowerCase().includes(busqueda.toLowerCase())
     );
 
-    // NUEVA FUNCIÓN: Seleccionar/deseleccionar participante para correo
     const toggleSeleccionParticipante = (participanteId: string) => {
         setParticipantesSeleccionados(prev => {
             if (prev.includes(participanteId)) {
@@ -244,18 +214,15 @@ const AlertasCorreo = () => {
         });
     };
 
-    // NUEVA FUNCIÓN: Seleccionar todos los participantes filtrados
     const seleccionarTodosFiltrados = () => {
         const idsFiltrados = participantesFiltrados.map(p => p.id);
         setParticipantesSeleccionados(idsFiltrados);
     };
 
-    // NUEVA FUNCIÓN: Deseleccionar todos
     const deseleccionarTodos = () => {
         setParticipantesSeleccionados([]);
     };
 
-    // NUEVA FUNCIÓN: Enviar correo de prueba a participantes seleccionados
     const enviarCorreoPruebaSeleccionados = async () => {
         if (participantesSeleccionados.length === 0) {
             setMensajeError('Por favor, selecciona al menos un participante.');
@@ -267,7 +234,6 @@ const AlertasCorreo = () => {
         setMensajeExito(null);
 
         try {
-            // Obtener emails de los participantes seleccionados
             const participantesParaEnviar = participantes.filter(p =>
                 participantesSeleccionados.includes(p.id)
             );
@@ -279,7 +245,6 @@ const AlertasCorreo = () => {
                 return;
             }
 
-            // Enviar correo de prueba a cada participante
             const promesas = emails.map(email =>
                 notificacionesService.enviarCorreoPrueba(email)
             );
@@ -294,11 +259,10 @@ const AlertasCorreo = () => {
                 (fallidos > 0 ? `${fallidos} correos fallaron.` : 'Todos los correos fueron enviados correctamente.')
             );
 
-            // Limpiar selección después del envío exitoso
+            // Cerrar modal automáticamente y limpiar selección
             if (exitosos > 0) {
                 setParticipantesSeleccionados([]);
                 setMostrarModalCorreo(false);
-                // Recargar notificaciones para actualizar estadísticas
                 cargarNotificaciones();
             }
 
@@ -310,7 +274,6 @@ const AlertasCorreo = () => {
         }
     };
 
-    // NUEVA FUNCIÓN: Notificar a todos los participantes de la sesión
     const notificarParticipantesSesion = async () => {
         if (!sesionSeleccionada) {
             setMensajeError('No hay una sesión seleccionada.');
@@ -325,7 +288,6 @@ const AlertasCorreo = () => {
             await notificacionesService.notificarParticipantesSesion(sesionSeleccionada);
             setMensajeExito('Notificaciones enviadas a todos los participantes de la sesión exitosamente.');
 
-            // Recargar notificaciones para actualizar estadísticas
             cargarNotificaciones();
             setMostrarModalCorreo(false);
 
@@ -337,40 +299,12 @@ const AlertasCorreo = () => {
         }
     };
 
-    // NUEVA FUNCIÓN: Verificar email del participante seleccionado
-    const enviarCorreoParticipanteSeleccionado = async () => {
-        if (!participanteSeleccionado || !participanteSeleccionado.email) {
-            setMensajeError('Por favor, selecciona un participante con email válido.');
-            return;
-        }
-
-        setEnviandoCorreo(true);
-        setMensajeError(null);
-        setMensajeExito(null);
-
-        try {
-            await notificacionesService.enviarCorreoPrueba(participanteSeleccionado.email);
-            setMensajeExito(`Correo de prueba enviado exitosamente a ${participanteSeleccionado.email}`);
-
-            // Recargar notificaciones para actualizar estadísticas
-            cargarNotificaciones();
-
-        } catch (err: any) {
-            setMensajeError(`Error al enviar correo: ${err.message || 'Error desconocido'}`);
-            console.error('Error al enviar correo de prueba:', err);
-        } finally {
-            setEnviandoCorreo(false);
-        }
-    };
-
-    // NUEVA FUNCIÓN: Abrir modal para seleccionar destinatarios
     const abrirModalSeleccionDestinatarios = (tipo: 'prueba' | 'notificacion') => {
         setTipoCorreo(tipo);
         setMostrarModalCorreo(true);
         setMensajeError(null);
         setMensajeExito(null);
 
-        // Si es para un solo participante seleccionado, pre-seleccionarlo
         if (tipo === 'prueba' && participanteSeleccionado) {
             setParticipantesSeleccionados([participanteSeleccionado.id]);
         } else {
@@ -378,7 +312,6 @@ const AlertasCorreo = () => {
         }
     };
 
-    // FUNCIONES PARA CALENDARIO
     const getSessionTypeAndColor = (sesion: any) => {
         if (!sesion) return { type: 'Otro', color: '#9E9E9E' };
 
@@ -432,7 +365,7 @@ const AlertasCorreo = () => {
         return Array.from(tipos);
     };
 
-    // NUEVA FUNCIÓN: Renderizar calendario completo
+    // NUEVA FUNCIÓN: Renderizar calendario simplificado
     const renderCalendarioCompleto = () => {
         if (!calendario) return null;
 
@@ -440,132 +373,95 @@ const AlertasCorreo = () => {
         const esMesActual = hoy.getMonth() + 1 === mesActual && hoy.getFullYear() === añoActual;
 
         return (
-            <div className="overflow-x-auto">
-                <table className="w-full border-collapse">
-                    <thead>
-                        <tr className="bg-gray-50 dark:bg-gray-800">
-                            {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dia) => (
-                                <th
-                                    key={dia}
-                                    className="p-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-                                >
-                                    {dia}
-                                </th>
-                            ))}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {calendario.semanas.map((semana, semanaIndex) => (
-                            <tr key={semanaIndex} className="border-b border-gray-200 dark:border-gray-700">
-                                {semana.map((dia, diaIndex) => {
-                                    const esDiaActual = esMesActual &&
-                                        dia.esMesActual &&
-                                        dia.fecha.getDate() === hoy.getDate();
-
-                                    const esDiaSeleccionado = dia.esMesActual &&
-                                        dia.fecha.getDate() === diaSeleccionado;
-
-                                    return (
-                                        <td
-                                            key={diaIndex}
-                                            className={`
-                                                p-2 border border-gray-200 dark:border-gray-700 min-h-24
-                                                ${!dia.esMesActual ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
-                                                ${esDiaActual ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
-                                                ${esDiaSeleccionado ? 'ring-2 ring-primary ring-offset-1' : ''}
-                                            `}
-                                        >
-                                            <div className="flex flex-col h-full">
-                                                {/* Número del día */}
-                                                <div className={`
-                                                    flex items-center justify-between mb-1
-                                                    ${!dia.esMesActual ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}
-                                                `}>
-                                                    <span className={`
-                                                        text-sm font-medium px-2 py-1 rounded-full
-                                                        ${esDiaActual ? 'bg-primary text-white' : ''}
-                                                    `}>
-                                                        {dia.fecha.getDate()}
-                                                    </span>
-                                                    {dia.sesiones.length > 0 && (
-                                                        <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full">
-                                                            {dia.sesiones.length} sesión{dia.sesiones.length !== 1 ? 'es' : ''}
-                                                        </span>
-                                                    )}
-                                                </div>
-
-                                                {/* Sesiones y Eventos */}
-                                                <div className="flex-1 overflow-y-auto max-h-32 space-y-1">
-                                                    {/* Sesiones */}
-                                                    {dia.sesiones.map((sesion, idx) => {
-                                                        const { type, color } = getSessionTypeAndColor(sesion);
-                                                        return (
-                                                            <div
-                                                                key={`sesion-${idx}`}
-                                                                className="text-xs p-1 rounded cursor-pointer hover:opacity-90"
-                                                                style={{ backgroundColor: `${color}20`, borderLeft: `3px solid ${color}` }}
-                                                                title={`${sesion.titulo}\n${type}`}
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    handleDiaClick(dia.fecha.getDate());
-                                                                }}
-                                                            >
-                                                                <div className="font-medium truncate">{sesion.titulo}</div>
-                                                                <div className="flex justify-between">
-                                                                    <span className="truncate">{type}</span>
-                                                                    {sesion.hora && (
-                                                                        <span className="text-xs opacity-75">{sesion.hora}</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-
-                                                    {/* Eventos */}
-                                                    {dia.eventos.map((evento, idx) => {
-                                                        const { type, color } = getEventTypeAndColor(evento);
-                                                        return (
-                                                            <div
-                                                                key={`evento-${idx}`}
-                                                                className="text-xs p-1 rounded cursor-pointer hover:opacity-90"
-                                                                style={{
-                                                                    backgroundColor: `${color}15`,
-                                                                    borderLeft: `3px solid ${color}`,
-                                                                    borderStyle: 'dashed'
-                                                                }}
-                                                                title={`${evento.titulo}\n${type}`}
-                                                            >
-                                                                <div className="font-medium truncate">{evento.titulo}</div>
-                                                                <div className="flex justify-between">
-                                                                    <span className="truncate">{type}</span>
-                                                                    {evento.hora && (
-                                                                        <span className="text-xs opacity-75">{evento.hora}</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                {/* Indicador de click */}
-                                                {(dia.sesiones.length > 0 || dia.eventos.length > 0) && (
-                                                    <div className="text-center mt-1">
-                                                        <button
-                                                            onClick={() => handleDiaClick(dia.fecha.getDate())}
-                                                            className="text-xs text-primary hover:text-primary-dark dark:text-primary-light dark:hover:text-primary"
-                                                        >
-                                                            Ver detalles →
-                                                        </button>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </td>
-                                    );
-                                })}
+            <div className="overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full border-collapse min-w-[800px]">
+                        <thead>
+                            <tr className="bg-gray-50 dark:bg-gray-800">
+                                {['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'].map((dia) => (
+                                    <th
+                                        key={dia}
+                                        className="p-3 text-center text-sm font-semibold text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
+                                    >
+                                        {dia}
+                                    </th>
+                                ))}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody>
+                            {calendario.semanas.map((semana, semanaIndex) => (
+                                <tr key={semanaIndex} className="border-b border-gray-200 dark:border-gray-700">
+                                    {semana.map((dia, diaIndex) => {
+                                        const esDiaActual = esMesActual &&
+                                            dia.esMesActual &&
+                                            dia.fecha.getDate() === hoy.getDate();
+
+                                        const esDiaSeleccionado = dia.esMesActual &&
+                                            dia.fecha.getDate() === diaSeleccionado;
+
+                                        return (
+                                            <td
+                                                key={diaIndex}
+                                                className={`
+                                                    p-2 border border-gray-200 dark:border-gray-700 min-h-24
+                                                    ${!dia.esMesActual ? 'bg-gray-50 dark:bg-gray-800/50' : ''}
+                                                    ${esDiaActual ? 'bg-blue-50 dark:bg-blue-900/20' : ''}
+                                                    ${esDiaSeleccionado ? 'ring-2 ring-primary ring-offset-1' : ''}
+                                                `}
+                                            >
+                                                <div className="flex flex-col h-full">
+                                                    {/* Número del día */}
+                                                    <div className={`
+                                                        flex items-center justify-between mb-1
+                                                        ${!dia.esMesActual ? 'text-gray-400' : 'text-gray-700 dark:text-gray-300'}
+                                                    `}>
+                                                        <span className={`
+                                                            text-sm font-medium px-2 py-1 rounded-full
+                                                            ${esDiaActual ? 'bg-primary text-white' : ''}
+                                                        `}>
+                                                            {dia.fecha.getDate()}
+                                                        </span>
+                                                        {dia.sesiones.length > 0 && (
+                                                            <span className="text-xs bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 px-2 py-1 rounded-full">
+                                                                {dia.sesiones.length}
+                                                            </span>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Sesiones */}
+                                                    <div className="space-y-1">
+                                                        {dia.sesiones.slice(0, 2).map((sesion, idx) => {
+                                                            const { color } = getSessionTypeAndColor(sesion);
+                                                            return (
+                                                                <div
+                                                                    key={`sesion-${idx}`}
+                                                                    className="text-xs p-1 rounded cursor-pointer hover:opacity-90"
+                                                                    style={{ backgroundColor: `${color}20`, borderLeft: `3px solid ${color}` }}
+                                                                    title={`${sesion.titulo}`}
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleDiaClick(dia.fecha.getDate());
+                                                                    }}
+                                                                >
+                                                                    <div className="font-medium truncate">{sesion.titulo}</div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {dia.sesiones.length > 2 && (
+                                                            <div className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                                                                +{dia.sesiones.length - 2} más
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
         );
     };
@@ -650,10 +546,10 @@ const AlertasCorreo = () => {
                 </div>
             )}
 
-            {/* Calendario de Sesiones - MEJORADO */}
+            {/* Calendario de Sesiones - SIMPLIFICADO */}
             <Card
-                title="Calendario de Sesiones y Eventos"
-                subtitle={`${meses[mesActual - 1]} ${añoActual} - Haz clic en un día para ver detalles`}
+                title="Calendario de Sesiones"
+                subtitle={`${meses[mesActual - 1]} ${añoActual} - Haz clic en un día para ver participantes`}
             >
                 <div className="mb-6">
                     <div className="flex items-center justify-between">
@@ -697,142 +593,29 @@ const AlertasCorreo = () => {
                     </div>
                 </div>
 
-                {/* Calendario */}
+                {/* Calendario simplificado */}
                 {renderCalendarioCompleto()}
 
-                {/* Detalles del día seleccionado */}
-                {detalleDia && (
-                    <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                        <h4 className="font-bold text-lg mb-4 text-gray-900 dark:text-white">
-                            Detalles del {detalleDia.dia} de {meses[mesActual - 1]}
-                        </h4>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {/* Sesiones */}
-                            <div>
-                                <h5 className="font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                                    Sesiones ({detalleDia.sesiones.length})
-                                </h5>
-                                {detalleDia.sesiones.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {detalleDia.sesiones.map((sesion, idx) => {
-                                            const { type, color } = getSessionTypeAndColor(sesion);
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className="p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-primary dark:hover:border-primary transition-colors cursor-pointer"
-                                                    onClick={() => cargarParticipantesPorSesion(sesion.id)}
-                                                >
-                                                    <div className="flex items-start justify-between">
-                                                        <div>
-                                                            <div className="font-medium text-gray-900 dark:text-white">
-                                                                {sesion.titulo}
-                                                            </div>
-                                                            <div className="flex items-center gap-2 mt-1">
-                                                                <div
-                                                                    className="w-3 h-3 rounded-full"
-                                                                    style={{ backgroundColor: color }}
-                                                                />
-                                                                <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                                    {type}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                        <Button variant="ghost" size="sm">
-                                                            Ver participantes
-                                                        </Button>
-                                                    </div>
-                                                    {sesion.descripcion && (
-                                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                                                            {sesion.descripcion}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500 dark:text-gray-400 italic">
-                                        No hay sesiones programadas para este día.
-                                    </p>
-                                )}
-                            </div>
-
-                            {/* Eventos */}
-                            <div>
-                                <h5 className="font-semibold mb-2 text-gray-700 dark:text-gray-300">
-                                    Eventos ({detalleDia.eventos.length})
-                                </h5>
-                                {detalleDia.eventos.length > 0 ? (
-                                    <div className="space-y-2">
-                                        {detalleDia.eventos.map((evento, idx) => {
-                                            const { type, color } = getEventTypeAndColor(evento);
-                                            return (
-                                                <div
-                                                    key={idx}
-                                                    className="p-3 rounded-lg border border-gray-200 dark:border-gray-700"
-                                                    style={{ borderLeft: `4px solid ${color}` }}
-                                                >
-                                                    <div className="font-medium text-gray-900 dark:text-white">
-                                                        {evento.titulo}
-                                                    </div>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <div
-                                                            className="w-3 h-3 rounded-full"
-                                                            style={{ backgroundColor: color }}
-                                                        />
-                                                        <span className="text-sm text-gray-600 dark:text-gray-400">
-                                                            {type}
-                                                        </span>
-                                                        {evento.hora && (
-                                                            <span className="text-sm text-gray-500 dark:text-gray-400 ml-auto">
-                                                                {evento.hora}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <p className="text-gray-500 dark:text-gray-400 italic">
-                                        No hay eventos programados para este día.
-                                    </p>
-                                )}
-                            </div>
-                        </div>
+                {/* Leyenda mínima */}
+                <div className="mt-4 flex flex-wrap gap-3">
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-green-100 border border-green-500"></div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Días con sesiones</span>
                     </div>
-                )}
-
-                {/* Leyenda */}
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <h5 className="font-semibold mb-3 text-gray-700 dark:text-gray-300">Leyenda</h5>
-                    <div className="flex flex-wrap gap-4">
-                        {tiposEnCalendario.map((tipo: any, index) => {
-                            let color = '#9E9E9E';
-                            if (tipo === 'Capítulo Frontend') color = '#00448D';
-                            else if (tipo === 'Capítulo Backend') color = '#FF6B35';
-                            else if (tipo === 'Capítulo Data') color = '#FFD100';
-                            else if (tipo === 'Journey to Cloud') color = '#E31937';
-                            else if (tipo === 'Bienvenida') color = '#4CAF50';
-
-                            return (
-                                <div key={index} className="flex items-center gap-2">
-                                    <div
-                                        className="w-4 h-4 rounded"
-                                        style={{ backgroundColor: color }}
-                                    />
-                                    <span className="text-sm text-gray-600 dark:text-gray-400">{tipo}</span>
-                                </div>
-                            );
-                        })}
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Hoy</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full ring-2 ring-primary"></div>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">Seleccionado</span>
                     </div>
                 </div>
             </Card>
 
             {/* Participantes y Detalles */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
-                {/* Lista de Participantes - MODIFICADO CON CHECKBOXES */}
+                {/* Lista de Participantes */}
                 <div className="lg:col-span-2">
                     <Card
                         title={tituloParticipantes}
@@ -865,7 +648,7 @@ const AlertasCorreo = () => {
 
                         {/* Controles de selección */}
                         {participantesFiltrados.length > 0 && (
-                            <div className="flex items-center justify-between mb-4 p-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                            <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
                                 <div className="flex items-center gap-2">
                                     <span className="text-sm text-gray-600 dark:text-gray-300">
                                         {participantesSeleccionados.length} seleccionados
@@ -875,9 +658,10 @@ const AlertasCorreo = () => {
                                             variant="ghost"
                                             size="sm"
                                             onClick={() => abrirModalSeleccionDestinatarios('prueba')}
+                                            className="ml-2"
                                         >
-                                            <span className="material-symbols-outlined text-sm">send</span>
-                                            Enviar correo a seleccionados
+                                            <span className="material-symbols-outlined text-sm mr-1">send</span>
+                                            Enviar correo
                                         </Button>
                                     )}
                                 </div>
@@ -888,8 +672,8 @@ const AlertasCorreo = () => {
                                         onClick={seleccionarTodosFiltrados}
                                         disabled={participantesFiltrados.length === 0}
                                     >
-                                        <span className="material-symbols-outlined text-sm">check_box</span>
-                                        Seleccionar todos
+                                        <span className="material-symbols-outlined text-sm mr-1">check_box</span>
+                                        Todos
                                     </Button>
                                     <Button
                                         variant="ghost"
@@ -897,14 +681,14 @@ const AlertasCorreo = () => {
                                         onClick={deseleccionarTodos}
                                         disabled={participantesSeleccionados.length === 0}
                                     >
-                                        <span className="material-symbols-outlined text-sm">check_box_outline_blank</span>
-                                        Deseleccionar
+                                        <span className="material-symbols-outlined text-sm mr-1">check_box_outline_blank</span>
+                                        Ninguno
                                     </Button>
                                 </div>
                             </div>
                         )}
 
-                        {/* Tabla de Participantes MODIFICADA */}
+                        {/* Tabla de Participantes */}
                         <div className="overflow-x-auto">
                             {participantesFiltrados.length > 0 ? (
                                 <table className="w-full text-left">
@@ -938,12 +722,12 @@ const AlertasCorreo = () => {
                                                 key={participante.id}
                                                 onClick={() => setParticipanteSeleccionado(participante)}
                                                 className={`
-                          cursor-pointer border-b dark:border-gray-700 
-                          ${participanteSeleccionado?.id === participante.id
+                                                    cursor-pointer border-b dark:border-gray-700 
+                                                    ${participanteSeleccionado?.id === participante.id
                                                         ? 'bg-primary/10 dark:bg-primary/20 hover:bg-primary/20 dark:hover:bg-primary/30'
                                                         : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
                                                     }
-                        `}
+                                                `}
                                             >
                                                 <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
                                                     <input
@@ -1089,43 +873,7 @@ const AlertasCorreo = () => {
                                     </div>
                                 </div>
 
-                                {/* Sesión Asignada */}
-                                <div>
-                                    <label className="text-xs text-gray-500 dark:text-gray-400">
-                                        Sesión Asignada
-                                    </label>
-                                    <p className="text-sm text-gray-800 dark:text-gray-200">
-                                        {participanteSeleccionado.lugarAsignacion || 'No asignada'}
-                                    </p>
-                                </div>
-
-                                {/* Progreso del Onboarding */}
-                                <div>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <label className="text-xs text-gray-500 dark:text-gray-400">
-                                            Progreso del Onboarding
-                                        </label>
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {participanteSeleccionado.estadoTecnico === 'completado' ? '100%' :
-                                                participanteSeleccionado.estadoTecnico === 'en_progreso' ? '50%' : '0%'}
-                                        </span>
-                                    </div>
-                                    <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
-                                        <div
-                                            className="bg-yellow-500 h-2.5 rounded-full"
-                                            style={{
-                                                width: participanteSeleccionado.estadoTecnico === 'completado' ? '100%' :
-                                                    participanteSeleccionado.estadoTecnico === 'en_progreso' ? '50%' : '0%'
-                                            }}
-                                        ></div>
-                                    </div>
-                                    <p className="text-xs text-right text-gray-500 dark:text-gray-400 mt-1">
-                                        {participanteSeleccionado.estadoTecnico === 'completado' ? 'Completado' :
-                                            participanteSeleccionado.estadoTecnico === 'en_progreso' ? 'En progreso' : 'Pendiente'}
-                                    </p>
-                                </div>
-
-                                {/* Botón para enviar correo al participante seleccionado */}
+                                {/* Botón para enviar correo */}
                                 <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <Button
                                         variant="primary"
@@ -1153,7 +901,7 @@ const AlertasCorreo = () => {
                 </div>
             </div>
 
-            {/* Probar Notificaciones - MODIFICADO */}
+            {/* Probar Notificaciones */}
             <Card
                 title="Probar Notificaciones"
                 subtitle="Verifica la entrega de alertas por correo."
@@ -1213,20 +961,20 @@ const AlertasCorreo = () => {
                         <h4 className="font-medium text-green-800 dark:text-green-300 mb-2">
                             Estadísticas de Envío
                         </h4>
-                        <div className="flex items-center justify-between">
-                            <div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="text-center">
                                 <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.total}</p>
-                                <p className="text-sm text-green-600 dark:text-green-500">Total Notificaciones</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">Total</p>
                             </div>
-                            <div>
+                            <div className="text-center">
                                 <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.enviadas}</p>
                                 <p className="text-sm text-green-600 dark:text-green-500">Enviadas</p>
                             </div>
-                            <div>
+                            <div className="text-center">
                                 <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{estadisticas.pendientes}</p>
                                 <p className="text-sm text-yellow-600 dark:text-yellow-500">Pendientes</p>
                             </div>
-                            <div>
+                            <div className="text-center">
                                 <p className="text-2xl font-bold text-red-700 dark:text-red-400">{estadisticas.fallidas}</p>
                                 <p className="text-sm text-red-600 dark:text-red-500">Fallidas</p>
                             </div>
@@ -1235,91 +983,120 @@ const AlertasCorreo = () => {
                 </div>
             </Card>
 
-            {/* MODAL PARA SELECCIONAR DESTINATARIOS */}
+            {/* MODAL MEJORADO - SIN DOBLE SCROLL */}
             {mostrarModalCorreo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-                        <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-                            <h3 className="text-xl font-bold text-gray-900 dark:text-white">
-                                {tipoCorreo === 'prueba' ? 'Enviar Correo de Prueba' : 'Notificar Participantes'}
-                            </h3>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">
-                                {tipoCorreo === 'prueba'
-                                    ? 'Selecciona los participantes a quienes enviar el correo de prueba.'
-                                    : 'Selecciona los participantes a quienes enviar notificaciones.'}
-                            </p>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+                        {/* Encabezado */}
+                        <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                            <div className="flex justify-between items-center">
+                                <div>
+                                    <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+                                        {tipoCorreo === 'prueba' ? 'Enviar Correo de Prueba' : 'Notificar Participantes'}
+                                    </h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-1">
+                                        {tipoCorreo === 'prueba'
+                                            ? 'Selecciona los participantes a quienes enviar el correo de prueba.'
+                                            : 'Selecciona los participantes a quienes enviar notificaciones.'}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setMostrarModalCorreo(false)}
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                >
+                                    <span className="material-symbols-outlined">close</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-6">
-                            {participantesFiltrados.length > 0 ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                                            {participantesSeleccionados.length} de {participantesFiltrados.length} seleccionados
-                                        </span>
-                                        <div className="flex gap-2">
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={seleccionarTodosFiltrados}
-                                            >
-                                                Seleccionar todos
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={deseleccionarTodos}
-                                            >
-                                                Deseleccionar
-                                            </Button>
+                        {/* Contenido principal - SIN SCROLL HORIZONTAL */}
+                        <div className="flex-1 overflow-hidden">
+                            <div className="h-full overflow-y-auto px-6">
+                                {participantesFiltrados.length > 0 ? (
+                                    <div className="py-4">
+                                        {/* Contadores y controles */}
+                                        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {participantesSeleccionados.length} de {participantesFiltrados.length} seleccionados
+                                            </span>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={seleccionarTodosFiltrados}
+                                                    className="text-xs"
+                                                >
+                                                    Seleccionar todos
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={deseleccionarTodos}
+                                                    className="text-xs"
+                                                >
+                                                    Deseleccionar
+                                                </Button>
+                                            </div>
                                         </div>
-                                    </div>
 
-                                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                                        {participantesFiltrados.map((participante) => (
-                                            <div
-                                                key={participante.id}
-                                                className={`flex items-center gap-3 p-3 rounded-lg border ${participantesSeleccionados.includes(participante.id)
-                                                        ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                                                        : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50'
-                                                    }`}
-                                            >
-                                                <input
-                                                    type="checkbox"
-                                                    checked={participantesSeleccionados.includes(participante.id)}
-                                                    onChange={() => toggleSeleccionParticipante(participante.id)}
-                                                    className="rounded border-gray-300 dark:border-gray-600"
-                                                />
-                                                <div className="flex-1 min-w-0">
-                                                    <p className="font-medium text-gray-900 dark:text-white truncate">
-                                                        {participante.nombreCompleto}
-                                                    </p>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                                        {participante.email}
-                                                    </p>
-                                                    <div className="flex items-center gap-2 mt-1">
-                                                        <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded-full">
-                                                            {participante.departamento || 'Sin departamento'}
-                                                        </span>
-                                                        <span className={`text-xs px-2 py-1 rounded-full ${getEstadoColor(participante.estadoTecnico)}`}>
-                                                            {participante.estadoTecnico || 'pendiente'}
-                                                        </span>
+                                        {/* Lista de participantes - DISEÑO MEJORADO */}
+                                        <div className="space-y-2">
+                                            {participantesFiltrados.map((participante) => (
+                                                <div
+                                                    key={participante.id}
+                                                    className={`
+                                                        flex items-center gap-3 p-3 rounded-lg transition-colors
+                                                        ${participantesSeleccionados.includes(participante.id)
+                                                            ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700'
+                                                            : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700/50'
+                                                        }
+                                                    `}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={participantesSeleccionados.includes(participante.id)}
+                                                        onChange={() => toggleSeleccionParticipante(participante.id)}
+                                                        className="rounded border-gray-300 dark:border-gray-600 w-5 h-5"
+                                                    />
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="flex items-center justify-between">
+                                                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                                                                {participante.nombreCompleto}
+                                                            </p>
+                                                            <span className={`badge ${getEstadoColor(participante.estadoTecnico)} text-xs ml-2`}>
+                                                                {participante.estadoTecnico || 'pendiente'}
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate mt-1">
+                                                            {participante.email}
+                                                        </p>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                                {participante.departamento || 'Sin departamento'}
+                                                            </span>
+                                                            {participante.lugarAsignacion && (
+                                                                <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+                                                                    {getNombreSesion(participante.lugarAsignacion)}
+                                                                </span>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        ))}
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            ) : (
-                                <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                    <span className="material-symbols-outlined text-4xl mb-2">people</span>
-                                    <p>No hay participantes disponibles.</p>
-                                    <p className="text-sm mt-2">Primero carga los participantes desde el calendario.</p>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="text-center py-12 text-gray-500 dark:text-gray-400">
+                                        <span className="material-symbols-outlined text-4xl mb-2">people</span>
+                                        <p className="text-lg font-medium mb-2">No hay participantes disponibles</p>
+                                        <p className="text-sm">Primero carga los participantes desde el calendario.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
 
-                        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                        {/* Pie de página */}
+                        <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
                             <div className="flex justify-between items-center">
                                 <Button
                                     variant="ghost"
@@ -1335,6 +1112,7 @@ const AlertasCorreo = () => {
                                     variant="primary"
                                     onClick={tipoCorreo === 'prueba' ? enviarCorreoPruebaSeleccionados : notificarParticipantesSesion}
                                     disabled={participantesSeleccionados.length === 0 || enviandoCorreo}
+                                    className="min-w-32"
                                 >
                                     {enviandoCorreo ? (
                                         <>
