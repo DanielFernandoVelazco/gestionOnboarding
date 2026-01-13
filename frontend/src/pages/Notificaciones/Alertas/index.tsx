@@ -976,10 +976,10 @@ const AlertasCorreo = () => {
                 </div>
             </Card>
 
-            {/* MODAL MEJORADO - SIN DOBLE SCROLL */}
+            {/* MODAL MEJORADO - SIN SCROLL HORIZONTAL Y CON MEJOR DISEÑO */}
             {mostrarModalCorreo && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-3xl max-h-[85vh] flex flex-col">
                         {/* Encabezado */}
                         <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
                             <div className="flex justify-between items-center">
@@ -995,81 +995,96 @@ const AlertasCorreo = () => {
                                 </div>
                                 <button
                                     onClick={() => setMostrarModalCorreo(false)}
-                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300"
+                                    className="text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 p-1"
                                 >
-                                    <span className="material-symbols-outlined">close</span>
+                                    <span className="material-symbols-outlined text-2xl">close</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Contenido principal - SIN SCROLL HORIZONTAL */}
-                        <div className="flex-1 overflow-hidden">
-                            <div className="h-full overflow-y-auto px-6">
+                        {/* Contenido principal - CON UN SOLO SCROLL VERTICAL */}
+                        <div className="flex-1 overflow-hidden flex flex-col">
+                            {/* Contadores y controles */}
+                            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                            {participantesSeleccionados.length} de {participantesFiltrados.length} seleccionados
+                                        </span>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={seleccionarTodosFiltrados}
+                                            disabled={participantesFiltrados.length === 0}
+                                        >
+                                            <span className="material-symbols-outlined text-sm mr-1">check_box</span>
+                                            Seleccionar todos
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={deseleccionarTodos}
+                                            disabled={participantesSeleccionados.length === 0}
+                                        >
+                                            <span className="material-symbols-outlined text-sm mr-1">check_box_outline_blank</span>
+                                            Deseleccionar
+                                        </Button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Lista de participantes - DISEÑO MEJORADO SIN SCROLL HORIZONTAL */}
+                            <div className="flex-1 overflow-y-auto px-4">
                                 {participantesFiltrados.length > 0 ? (
                                     <div className="py-4">
-                                        {/* Contadores y controles */}
-                                        <div className="flex items-center justify-between mb-4 p-3 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                                {participantesSeleccionados.length} de {participantesFiltrados.length} seleccionados
-                                            </span>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={seleccionarTodosFiltrados}
-                                                    className="text-xs"
-                                                >
-                                                    Seleccionar todos
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={deseleccionarTodos}
-                                                    className="text-xs"
-                                                >
-                                                    Deseleccionar
-                                                </Button>
-                                            </div>
-                                        </div>
-
-                                        {/* Lista de participantes - DISEÑO MEJORADO */}
                                         <div className="space-y-2">
                                             {participantesFiltrados.map((participante) => (
                                                 <div
                                                     key={participante.id}
                                                     className={`
-                                                        flex items-center gap-3 p-3 rounded-lg transition-colors
+                                                        flex items-start gap-3 p-3 rounded-lg transition-colors w-full
                                                         ${participantesSeleccionados.includes(participante.id)
                                                             ? 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700'
                                                             : 'bg-gray-50 dark:bg-gray-700/30 border border-gray-200 dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700/50'
                                                         }
                                                     `}
                                                 >
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={participantesSeleccionados.includes(participante.id)}
-                                                        onChange={() => toggleSeleccionParticipante(participante.id)}
-                                                        className="rounded border-gray-300 dark:border-gray-600 w-5 h-5"
-                                                    />
+                                                    <div className="pt-1">
+                                                        <input
+                                                            type="checkbox"
+                                                            checked={participantesSeleccionados.includes(participante.id)}
+                                                            onChange={() => toggleSeleccionParticipante(participante.id)}
+                                                            className="rounded border-gray-300 dark:border-gray-600 w-5 h-5"
+                                                        />
+                                                    </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <div className="flex items-center justify-between">
-                                                            <p className="font-medium text-gray-900 dark:text-white truncate">
+                                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-1">
+                                                            <p className="font-medium text-gray-900 dark:text-white break-words">
                                                                 {participante.nombreCompleto}
                                                             </p>
-                                                            <span className={`badge ${getEstadoColor(participante.estadoTecnico)} text-xs ml-2`}>
+                                                            <span className={`badge ${getEstadoColor(participante.estadoTecnico)} text-xs whitespace-nowrap`}>
                                                                 {participante.estadoTecnico || 'pendiente'}
                                                             </span>
                                                         </div>
-                                                        <p className="text-sm text-gray-600 dark:text-gray-400 truncate mt-1">
+                                                        <p className="text-sm text-gray-600 dark:text-gray-400 break-all mb-2">
                                                             {participante.email}
                                                         </p>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                {participante.departamento || 'Sin departamento'}
-                                                            </span>
+                                                        <div className="flex flex-wrap items-center gap-2">
+                                                            {participante.departamento && (
+                                                                <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                                                                    {participante.departamento}
+                                                                </span>
+                                                            )}
                                                             {participante.lugarAsignacion && (
-                                                                <span className="text-xs px-2 py-0.5 bg-gray-100 dark:bg-gray-700 rounded">
+                                                                <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
                                                                     {getNombreSesion(participante.lugarAsignacion)}
+                                                                </span>
+                                                            )}
+                                                            {participante.puesto && (
+                                                                <span className="text-xs px-2 py-1 bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
+                                                                    {participante.puesto}
                                                                 </span>
                                                             )}
                                                         </div>
@@ -1090,7 +1105,7 @@ const AlertasCorreo = () => {
 
                         {/* Pie de página */}
                         <div className="p-6 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 flex-shrink-0">
-                            <div className="flex justify-between items-center">
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                                 <Button
                                     variant="ghost"
                                     onClick={() => {
@@ -1098,32 +1113,38 @@ const AlertasCorreo = () => {
                                         setMensajeError(null);
                                         setMensajeExito(null);
                                     }}
+                                    className="w-full sm:w-auto"
                                 >
                                     Cancelar
                                 </Button>
-                                <Button
-                                    variant="primary"
-                                    onClick={tipoCorreo === 'prueba' ? enviarCorreoPruebaSeleccionados : notificarParticipantesSesion}
-                                    disabled={participantesSeleccionados.length === 0 || enviandoCorreo}
-                                    className="min-w-32"
-                                >
-                                    {enviandoCorreo ? (
-                                        <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Enviando...
-                                        </>
-                                    ) : tipoCorreo === 'prueba' ? (
-                                        <>
-                                            <span className="material-symbols-outlined mr-2">send</span>
-                                            Enviar Correo{participantesSeleccionados.length > 1 ? 's' : ''}
-                                        </>
-                                    ) : (
-                                        <>
-                                            <span className="material-symbols-outlined mr-2">notifications</span>
-                                            Enviar Notificaciones
-                                        </>
-                                    )}
-                                </Button>
+                                <div className="flex gap-3">
+                                    <div className="text-sm text-gray-600 dark:text-gray-400 self-center">
+                                        {participantesSeleccionados.length} destinatarios
+                                    </div>
+                                    <Button
+                                        variant="primary"
+                                        onClick={tipoCorreo === 'prueba' ? enviarCorreoPruebaSeleccionados : notificarParticipantesSesion}
+                                        disabled={participantesSeleccionados.length === 0 || enviandoCorreo}
+                                        className="min-w-32 w-full sm:w-auto"
+                                    >
+                                        {enviandoCorreo ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Enviando...
+                                            </>
+                                        ) : tipoCorreo === 'prueba' ? (
+                                            <>
+                                                <span className="material-symbols-outlined mr-2">send</span>
+                                                Enviar Correo{participantesSeleccionados.length > 1 ? 's' : ''}
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined mr-2">notifications</span>
+                                                Enviar Notificaciones
+                                            </>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
                     </div>
