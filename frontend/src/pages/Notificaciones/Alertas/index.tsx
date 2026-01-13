@@ -907,14 +907,7 @@ const AlertasCorreo = () => {
                 subtitle="Verifica la entrega de alertas por correo."
                 actions={
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => abrirModalSeleccionDestinatarios('prueba')}>
-                            <span className="material-symbols-outlined">send</span>
-                            Enviar Correo de Prueba
-                        </Button>
-                        <Button variant="outline" onClick={() => abrirModalSeleccionDestinatarios('notificacion')}>
-                            <span className="material-symbols-outlined">notifications</span>
-                            Notificar Participantes
-                        </Button>
+
                     </div>
                 }
             >
