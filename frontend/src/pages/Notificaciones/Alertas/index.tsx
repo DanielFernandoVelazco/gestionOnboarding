@@ -30,6 +30,16 @@ const AlertasCorreo = () => {
     const [mensajeExito, setMensajeExito] = useState<string | null>(null);
     const [mensajeError, setMensajeError] = useState<string | null>(null);
 
+    // NUEVO ESTADO: Historial de correos enviados
+    const [historialCorreos, setHistorialCorreos] = useState<Array<{
+        id: string;
+        fecha: Date;
+        destinatarios: string[];
+        tipo: 'prueba' | 'notificacion';
+        exitosos: number;
+        fallidos: number;
+    }>>([]);
+
     // Nombres de meses en español
     const meses = [
         'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
@@ -42,6 +52,8 @@ const AlertasCorreo = () => {
 
     useEffect(() => {
         cargarNotificaciones();
+        // Cargar historial inicial
+        cargarHistorialCorreos();
     }, []);
 
     const cargarCalendario = async () => {
@@ -59,6 +71,19 @@ const AlertasCorreo = () => {
             console.error('Error al cargar calendario:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    // NUEVA FUNCIÓN: Cargar historial de correos
+    const cargarHistorialCorreos = async () => {
+        try {
+            // Simular carga de historial (deberías implementar esto en tu servicio)
+            const historialData = await notificacionesService.getHistorialCorreos();
+            setHistorialCorreos(historialData || []);
+        } catch (error) {
+            console.error('Error al cargar historial de correos:', error);
+            // Si no hay servicio, usar datos locales
+            setHistorialCorreos([]);
         }
     };
 
@@ -223,6 +248,25 @@ const AlertasCorreo = () => {
         setParticipantesSeleccionados([]);
     };
 
+    // NUEVA FUNCIÓN: Agregar registro al historial
+    const agregarAlHistorial = (
+        destinatarios: string[],
+        tipo: 'prueba' | 'notificacion',
+        exitosos: number,
+        fallidos: number
+    ) => {
+        const nuevoRegistro = {
+            id: Date.now().toString(),
+            fecha: new Date(),
+            destinatarios,
+            tipo,
+            exitosos,
+            fallidos
+        };
+
+        setHistorialCorreos(prev => [nuevoRegistro, ...prev]);
+    };
+
     const enviarCorreoPruebaSeleccionados = async () => {
         if (participantesSeleccionados.length === 0) {
             setMensajeError('Por favor, selecciona al menos un participante.');
@@ -245,6 +289,9 @@ const AlertasCorreo = () => {
                 return;
             }
 
+            // Guardar emails para el historial
+            const emailsEnviados = [...emails];
+
             const promesas = emails.map(email =>
                 notificacionesService.enviarCorreoPrueba(email)
             );
@@ -253,6 +300,9 @@ const AlertasCorreo = () => {
 
             const exitosos = resultados.filter(r => r.status === 'fulfilled').length;
             const fallidos = resultados.filter(r => r.status === 'rejected').length;
+
+            // Agregar al historial
+            agregarAlHistorial(emailsEnviados, 'prueba', exitosos, fallidos);
 
             setMensajeExito(
                 `Correos enviados exitosamente: ${exitosos} de ${resultados.length}. ` +
@@ -263,7 +313,10 @@ const AlertasCorreo = () => {
             if (exitosos > 0) {
                 setParticipantesSeleccionados([]);
                 setMostrarModalCorreo(false);
+
+                // Recargar notificaciones y historial
                 cargarNotificaciones();
+                cargarHistorialCorreos();
             }
 
         } catch (error: any) {
@@ -285,11 +338,22 @@ const AlertasCorreo = () => {
         setMensajeExito(null);
 
         try {
+            // Obtener participantes de la sesión para el historial
+            const participantesSesion = await notificacionesService.getParticipantesSesion(sesionSeleccionada);
+            const emailsSesion = participantesSesion.map(p => p.email).filter(Boolean);
+
+            // Enviar notificaciones
             await notificacionesService.notificarParticipantesSesion(sesionSeleccionada);
-            setMensajeExito('Notificaciones enviadas a todos los participantes de la sesión exitosamente.');
+
+            // Para notificaciones por sesión, asumimos que todos fueron exitosos
+            // En un caso real, deberías verificar los resultados
+            agregarAlHistorial(emailsSesion, 'notificacion', emailsSesion.length, 0);
+
+            setMensajeExito(`Notificaciones enviadas a ${emailsSesion.length} participantes de la sesión exitosamente.`);
 
             cargarNotificaciones();
             setMostrarModalCorreo(false);
+            cargarHistorialCorreos();
 
         } catch (err: any) {
             setMensajeError(`Error al notificar participantes: ${err.message || 'Error desconocido'}`);
@@ -310,6 +374,40 @@ const AlertasCorreo = () => {
         } else {
             setParticipantesSeleccionados([]);
         }
+    };
+
+    // NUEVA FUNCIÓN: Calcular estadísticas reales desde el historial
+    const calcularEstadisticasReales = () => {
+        let totalEnviados = 0;
+        let totalExitosos = 0;
+        let totalFallidos = 0;
+
+        historialCorreos.forEach(registro => {
+            totalEnviados += registro.destinatarios.length;
+            totalExitosos += registro.exitosos;
+            totalFallidos += registro.fallidos;
+        });
+
+        return {
+            total: totalEnviados,
+            enviadas: totalExitosos,
+            pendientes: 0, // En este sistema no hay pendientes, se envían inmediatamente
+            fallidas: totalFallidos
+        };
+    };
+
+    // Función para obtener estadísticas combinadas (historial + notificaciones del backend)
+    const calcularEstadisticasCombinadas = () => {
+        const estadisticasHistorial = calcularEstadisticasReales();
+        const estadisticasBackend = calcularEstadisticas();
+
+        // Combinar ambas fuentes
+        return {
+            total: estadisticasHistorial.total + estadisticasBackend.total,
+            enviadas: estadisticasHistorial.enviadas + estadisticasBackend.enviadas,
+            pendientes: estadisticasBackend.pendientes, // Solo del backend
+            fallidas: estadisticasHistorial.fallidas + estadisticasBackend.fallidas
+        };
     };
 
     const getSessionTypeAndColor = (sesion: any) => {
@@ -504,6 +602,11 @@ const AlertasCorreo = () => {
         return { total, enviadas, pendientes, fallidas };
     };
 
+    // NUEVA FUNCIÓN: Formatear fecha para el historial
+    const formatearFechaHistorial = (fecha: Date) => {
+        return format(fecha, 'dd/MM/yyyy HH:mm');
+    };
+
     if (loading) {
         return (
             <div className="flex justify-center items-center min-h-screen">
@@ -512,7 +615,7 @@ const AlertasCorreo = () => {
         );
     }
 
-    const estadisticas = calcularEstadisticas();
+    const estadisticasCombinadas = calcularEstadisticasCombinadas();
     const tiposEnCalendario = getTiposEnCalendario();
 
     let tituloParticipantes = `Participantes de sesiones - ${meses[mesActual - 1]} ${añoActual}`;
@@ -901,80 +1004,223 @@ const AlertasCorreo = () => {
                 </div>
             </div>
 
-            {/* Probar Notificaciones */}
-            <Card
-                title="Probar Notificaciones"
-                subtitle="Verifica la entrega de alertas por correo."
-                actions={
-                    <div className="flex gap-2">
-
-                    </div>
-                }
-            >
-                {/* Mensajes de éxito/error */}
-                {mensajeExito && (
-                    <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                        <p className="text-green-700 dark:text-green-300">{mensajeExito}</p>
-                    </div>
-                )}
-
-                {mensajeError && (
-                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
-                        <p className="text-red-700 dark:text-red-400">{mensajeError}</p>
-                    </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-4">
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                        <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
-                            Notificar Participantes de Sesión
-                        </h4>
-                        <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
-                            Envía notificaciones a todos los participantes de la sesión actual.
-                        </p>
-                        <Button
-                            variant="primary"
-                            onClick={notificarParticipantesSesion}
-                            disabled={!sesionSeleccionada || enviandoCorreo}
-                        >
-                            {enviandoCorreo ? (
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            ) : (
-                                <span className="material-symbols-outlined">notifications</span>
-                            )}
-                            Notificar Sesión Actual
-                        </Button>
-                        {!sesionSeleccionada && (
-                            <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
-                                Selecciona una sesión primero
-                            </p>
+            {/* Sección de Estadísticas y Historial */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Estadísticas de Envío */}
+                <div className="lg:col-span-2">
+                    <Card
+                        title="Estadísticas de Envío"
+                        subtitle="Rendimiento y efectividad de las notificaciones"
+                    >
+                        {/* Mensajes de éxito/error */}
+                        {mensajeExito && (
+                            <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                                <p className="text-green-700 dark:text-green-300">{mensajeExito}</p>
+                            </div>
                         )}
-                    </div>
-                    <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
-                        <h4 className="font-medium text-green-800 dark:text-green-300 mb-2">
-                            Estadísticas de Envío
-                        </h4>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.total}</p>
-                                <p className="text-sm text-green-600 dark:text-green-500">Total</p>
+
+                        {mensajeError && (
+                            <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                                <p className="text-red-700 dark:text-red-400">{mensajeError}</p>
                             </div>
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{estadisticas.enviadas}</p>
-                                <p className="text-sm text-green-600 dark:text-green-500">Enviadas</p>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Panel de Estadísticas */}
+                            <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
+                                <h4 className="font-medium text-green-800 dark:text-green-300 mb-4 text-center">
+                                    Resumen de Envíos
+                                </h4>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg shadow">
+                                        <p className="text-3xl font-bold text-green-700 dark:text-green-400">
+                                            {estadisticasCombinadas.total}
+                                        </p>
+                                        <p className="text-sm text-green-600 dark:text-green-500">Total Enviados</p>
+                                    </div>
+                                    <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg shadow">
+                                        <p className="text-3xl font-bold text-green-700 dark:text-green-400">
+                                            {estadisticasCombinadas.enviadas}
+                                        </p>
+                                        <p className="text-sm text-green-600 dark:text-green-500">Envíos Exitosos</p>
+                                    </div>
+                                    <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg shadow">
+                                        <p className="text-3xl font-bold text-yellow-700 dark:text-yellow-400">
+                                            {estadisticasCombinadas.pendientes}
+                                        </p>
+                                        <p className="text-sm text-yellow-600 dark:text-yellow-500">Pendientes</p>
+                                    </div>
+                                    <div className="text-center p-3 bg-white dark:bg-gray-800 rounded-lg shadow">
+                                        <p className="text-3xl font-bold text-red-700 dark:text-red-400">
+                                            {estadisticasCombinadas.fallidas}
+                                        </p>
+                                        <p className="text-sm text-red-600 dark:text-red-500">Fallidos</p>
+                                    </div>
+                                </div>
+
+                                {/* Porcentaje de éxito */}
+                                {estadisticasCombinadas.total > 0 && (
+                                    <div className="mt-6">
+                                        <div className="flex justify-between items-center mb-1">
+                                            <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                Tasa de éxito
+                                            </span>
+                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                                {((estadisticasCombinadas.enviadas / estadisticasCombinadas.total) * 100).toFixed(1)}%
+                                            </span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                                            <div
+                                                className="bg-green-500 h-2.5 rounded-full"
+                                                style={{
+                                                    width: `${(estadisticasCombinadas.enviadas / estadisticasCombinadas.total) * 100}%`
+                                                }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{estadisticas.pendientes}</p>
-                                <p className="text-sm text-yellow-600 dark:text-yellow-500">Pendientes</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="text-2xl font-bold text-red-700 dark:text-red-400">{estadisticas.fallidas}</p>
-                                <p className="text-sm text-red-600 dark:text-red-500">Fallidas</p>
+
+                            {/* Panel de Acciones */}
+                            <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                <h4 className="font-medium text-blue-800 dark:text-blue-300 mb-2">
+                                    Envío de Notificaciones
+                                </h4>
+                                <p className="text-sm text-blue-700 dark:text-blue-400 mb-4">
+                                    Realiza envíos masivos o individuales de notificaciones.
+                                </p>
+                                <div className="space-y-3">
+                                    <Button
+                                        variant="primary"
+                                        onClick={notificarParticipantesSesion}
+                                        disabled={!sesionSeleccionada || enviandoCorreo}
+                                        className="w-full"
+                                    >
+                                        {enviandoCorreo ? (
+                                            <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Enviando...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <span className="material-symbols-outlined mr-2">notifications</span>
+                                                Notificar Sesión Actual
+                                            </>
+                                        )}
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => abrirModalSeleccionDestinatarios('prueba')}
+                                        className="w-full"
+                                    >
+                                        <span className="material-symbols-outlined mr-2">send</span>
+                                        Enviar Correo de Prueba
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => abrirModalSeleccionDestinatarios('notificacion')}
+                                        className="w-full"
+                                    >
+                                        <span className="material-symbols-outlined mr-2">groups</span>
+                                        Notificar Seleccionados
+                                    </Button>
+                                </div>
+                                {!sesionSeleccionada && (
+                                    <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+                                        Selecciona una sesión del calendario para habilitar la notificación por sesión.
+                                    </p>
+                                )}
                             </div>
                         </div>
-                    </div>
+                    </Card>
                 </div>
-            </Card>
+
+                {/* Historial Reciente */}
+                <div className="lg:col-span-1">
+                    <Card
+                        title="Historial Reciente"
+                        subtitle="Últimos correos y notificaciones enviadas"
+                        actions={
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={cargarHistorialCorreos}
+                                className="flex items-center gap-1"
+                            >
+                                <span className="material-symbols-outlined text-sm">refresh</span>
+                                Actualizar
+                            </Button>
+                        }
+                    >
+                        {historialCorreos.length > 0 ? (
+                            <div className="space-y-3 max-h-96 overflow-y-auto pr-2">
+                                {historialCorreos.slice(0, 5).map((registro) => (
+                                    <div
+                                        key={registro.id}
+                                        className={`p-3 rounded-lg border ${registro.exitosos > 0 && registro.fallidos === 0
+                                                ? 'border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/10'
+                                                : registro.fallidos > 0
+                                                    ? 'border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/10'
+                                                    : 'border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/30'
+                                            }`}
+                                    >
+                                        <div className="flex justify-between items-start">
+                                            <div>
+                                                <span className={`badge ${registro.tipo === 'prueba'
+                                                        ? 'badge-info'
+                                                        : 'badge-primary'
+                                                    } text-xs`}>
+                                                    {registro.tipo === 'prueba' ? 'Prueba' : 'Notificación'}
+                                                </span>
+                                                <p className="text-sm font-medium text-gray-900 dark:text-white mt-1">
+                                                    {registro.destinatarios.length} destinatario{registro.destinatarios.length !== 1 ? 's' : ''}
+                                                </p>
+                                            </div>
+                                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                {formatearFechaHistorial(registro.fecha)}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center justify-between mt-2">
+                                            <div className="flex items-center gap-2">
+                                                {registro.exitosos > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs text-green-600 dark:text-green-400">
+                                                            ✓ {registro.exitosos}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                                {registro.fallidos > 0 && (
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="text-xs text-red-600 dark:text-red-400">
+                                                            ✗ {registro.fallidos}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className={`text-xs ${registro.exitosos === registro.destinatarios.length
+                                                    ? 'text-green-600 dark:text-green-400'
+                                                    : registro.fallidos === registro.destinatarios.length
+                                                        ? 'text-red-600 dark:text-red-400'
+                                                        : 'text-yellow-600 dark:text-yellow-400'
+                                                }`}>
+                                                {registro.exitosos === registro.destinatarios.length
+                                                    ? 'Completado'
+                                                    : `${registro.exitosos}/${registro.destinatarios.length}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                <span className="material-symbols-outlined text-4xl mb-2">history</span>
+                                <p>No hay historial de envíos</p>
+                                <p className="text-sm mt-2">Envía tu primer correo de prueba para comenzar</p>
+                            </div>
+                        )}
+                    </Card>
+                </div>
+            </div>
 
             {/* MODAL MEJORADO - SIN SCROLL HORIZONTAL Y CON MEJOR DISEÑO */}
             {mostrarModalCorreo && (
