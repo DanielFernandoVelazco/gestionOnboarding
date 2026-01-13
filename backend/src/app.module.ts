@@ -10,6 +10,7 @@ import { CalendarioModule } from './modules/calendario/calendario.module';
 import { NotificacionesModule } from './modules/notificaciones/notificaciones.module';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { AuthService } from './modules/auth/auth.service';
+import { CorreoModule } from './modules/correo/correo.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { AuthService } from './modules/auth/auth.service';
     OnboardingModule,
     CalendarioModule,
     NotificacionesModule,
+    CorreoModule,
   ],
   controllers: [AppController],
   providers: [AppService],
