@@ -1,0 +1,81 @@
+<h2 mat-dialog-title>Detalle de Correo</h2>
+
+<mat-dialog-content>
+    <div class="detalle-container">
+        <!-- Información básica -->
+        <div class="info-section">
+            <h3>Información General</h3>
+            <div class="info-grid">
+                <div class="info-item">
+                    <strong>Destinatario:</strong>
+                    <span>{{ correo.destinatario }}</span>
+                    <button mat-icon-button color="primary" (click)="copiarTexto(correo.destinatario)"
+                        matTooltip="Copiar email">
+                        <mat-icon>content_copy</mat-icon>
+                    </button>
+                </div>
+
+                <div class="info-item">
+                    <strong>Asunto:</strong>
+                    <span>{{ correo.asunto }}</span>
+                </div>
+
+                <div class="info-item">
+                    <strong>Tipo:</strong>
+                    <span [class]="'badge tipo-' + (correo.tipo || 'general')">
+                        {{ correo.tipo || 'General' }}
+                    </span>
+                </div>
+
+                <div class="info-item">
+                    <strong>Estado:</strong>
+                    <span [class]="correo.enviado ? 'text-success' : 'text-danger'">
+                        <mat-icon>{{ correo.enviado ? 'check_circle' : 'error' }}</mat-icon>
+                        {{ correo.enviado ? 'Enviado exitosamente' : 'Error al enviar' }}
+                    </span>
+                </div>
+
+                <div class="info-item">
+                    <strong>Fecha de envío:</strong>
+                    <span>{{ formatearFecha(correo.fecha_envio) }}</span>
+                </div>
+
+                <div *ngIf="correo.fecha_lectura" class="info-item">
+                    <strong>Fecha de lectura:</strong>
+                    <span>{{ formatearFecha(correo.fecha_lectura) }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenido del correo -->
+        <div *ngIf="correo.cuerpo" class="info-section">
+            <h3>Contenido del Correo</h3>
+            <div class="correo-contenido">
+                <pre>{{ correo.cuerpo }}</pre>
+                <button mat-raised-button color="primary" (click)="copiarTexto(correo.cuerpo || '')">
+                    <mat-icon>content_copy</mat-icon>
+                    Copiar contenido
+                </button>
+            </div>
+        </div>
+
+        <!-- Error (si existe) -->
+        <div *ngIf="correo.error" class="info-section">
+            <h3>Error</h3>
+            <div class="error-message">
+                <mat-icon color="warn">error</mat-icon>
+                <span>{{ correo.error }}</span>
+            </div>
+        </div>
+
+        <!-- Metadata (si existe) -->
+        <div *ngIf="correo.metadata" class="info-section">
+            <h3>Metadatos</h3>
+            <pre class="metadata">{{ correo.metadata | json }}</pre>
+        </div>
+    </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+    <button mat-button (click)="close()">Cerrar</button>
+</mat-dialog-actions>
