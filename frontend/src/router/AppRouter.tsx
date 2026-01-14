@@ -62,10 +62,6 @@ const AppRouter = () => {
                     <Route path="calendario" element={<CalendarioOnboardings />} />
                     <Route path="gestion" element={<GestionOnboarding />} />
                 </Route>
-                <Route path="/correo" element={<CorreoDashboard />} />
-                <Route path="/correo/historial" element={<CorreoDashboard initialTab={1} />} />
-                <Route path="/correo/enviar" element={<CorreoDashboard initialTab={0} />} />
-                <Route path="/correo/estadisticas" element={<CorreoDashboard initialTab={2} />} />
             </Route>
 
             {/* Ruta 404 */}
